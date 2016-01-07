@@ -1,14 +1,12 @@
 package main
 
 import (
-	// "github.com/kisielk/gotool"
-	// "golang.org/x/tools/go/loader"
 	"fmt"
+	"github.com/tsuna/gorewrite"
 	"github.com/tucnak/climax"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	// "path/filepath"
 )
 
 func main() {
@@ -81,37 +79,59 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 			return nil
 		}
 		fmt.Println(n.Name)
-		sendOrReceiveFinder := new(SendOrReceiveFinder)
-		ast.Walk(sendOrReceiveFinder, n.Body)
+		sendOrReceiveRewriter := new(SendOrReceiveRewriter)
+		gorewrite.Rewrite(sendOrReceiveRewriter, n.Body)
 		return nil // Prune search
 	}
 
 	return nil // Prune search
 }
 
-type SendOrReceiveFinder struct{}
+type SendOrReceiveRewriter struct{}
 
 // Visit implements the ast.Visitor interface.
-func (f *SendOrReceiveFinder) Visit(node ast.Node) ast.Visitor {
-	if node == nil {
-		return nil
-	}
+func (f *SendOrReceiveRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
+	// if node == nil {
+	// 	return nil, nil
+	// }
 
 	switch n := node.(type) {
 	case *ast.SendStmt:
-		// sendStmtCpy := n
-		// node = new(ast.BlockStmt)
-		// append(node)
 		fmt.Println("send to channl: ", n)
-		return nil
+		return AddSendCallExpr(n), nil
 	case *ast.UnaryExpr:
 		// if we have a reading from channel
 		if n.Op == token.ARROW {
 			fmt.Println("receive from channel: ", n.OpPos)
 		}
+	}
+	return node, f
+}
 
-		return nil
+func AddSendCallExpr(sendStmt *ast.SendStmt) *ast.CallExpr {
+	sendFunc, err := parser.ParseExpr("glimmer.Send")
+	if err != nil {
+		panic("can't parse AddChan expression")
 	}
 
-	return f
+	return &ast.CallExpr{
+		Fun:  sendFunc,
+		Args: []ast.Expr{sendStmt.Chan, sendStmt.Value},
+	}
 }
+
+// func AddChanCallExpr(sendStmt *ast.SendStmt) *ast.CallExpr {
+// 	addChanFunc, err := parser.ParseExpr("AddChan")
+// 	if err != nil {
+// 		panic("can't parse AddChan expression")
+// 	}
+
+// 	return &ast.CallExpr{
+// 		Fun:  addChanFunc,
+// 		Args: []Expr{sendStmt.Chan},
+// 	}
+// }
+
+// func AddSendExprStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
+
+// }
