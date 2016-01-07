@@ -38,6 +38,12 @@ func main() {
 }
 
 // glimmer
+func testFunc() {
+	ch := make(chan int, 2)
+	ch <- 1
+	<-ch
+}
+
 func run(path string) {
 	fset := token.NewFileSet()
 
@@ -93,9 +99,10 @@ func (f *SendOrReceiveFinder) Visit(node ast.Node) ast.Visitor {
 
 	switch n := node.(type) {
 	case *ast.SendStmt:
-		sendStmtCpy := n
-		node = new(ast.BlockStmt)
-		append(node)
+		// sendStmtCpy := n
+		// node = new(ast.BlockStmt)
+		// append(node)
+		fmt.Println("send to channl: ", n)
 		return nil
 	case *ast.UnaryExpr:
 		// if we have a reading from channel
