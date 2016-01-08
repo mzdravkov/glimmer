@@ -91,47 +91,45 @@ type SendOrReceiveRewriter struct{}
 
 // Visit implements the ast.Visitor interface.
 func (f *SendOrReceiveRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
-	// if node == nil {
-	// 	return nil, nil
-	// }
-
 	switch n := node.(type) {
 	case *ast.SendStmt:
 		fmt.Println("send to channl: ", n)
-		return AddSendCallExpr(n), nil
+		return AddSendExprStmt(n), nil
 	case *ast.UnaryExpr:
 		// if we have a reading from channel
 		if n.Op == token.ARROW {
-			fmt.Println("receive from channel: ", n.OpPos)
+			fmt.Println("receive from channel: ", n)
+			return AddRecvExprStmt(n), nil
 		}
+		//TODO: make a special case for result, ok := <-ch
 	}
 	return node, f
 }
 
-func AddSendCallExpr(sendStmt *ast.SendStmt) *ast.CallExpr {
+func AddSendExprStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
 	sendFunc, err := parser.ParseExpr("glimmer.Send")
 	if err != nil {
-		panic("can't parse AddChan expression")
+		panic("can't parse glimmer.Send expression")
 	}
 
-	return &ast.CallExpr{
+	callSendExpression := &ast.CallExpr{
 		Fun:  sendFunc,
 		Args: []ast.Expr{sendStmt.Chan, sendStmt.Value},
 	}
+
+	return &ast.ExprStmt{X: callSendExpression}
 }
 
-// func AddChanCallExpr(sendStmt *ast.SendStmt) *ast.CallExpr {
-// 	addChanFunc, err := parser.ParseExpr("AddChan")
-// 	if err != nil {
-// 		panic("can't parse AddChan expression")
-// 	}
+func AddRecvExprStmt(recvExpr *ast.UnaryExpr) ast.Expr {
+	recieveFunc, err := parser.ParseExpr("glimmer.Recieve")
+	if err != nil {
+		panic("can't parse glimmer.Receive expression")
+	}
 
-// 	return &ast.CallExpr{
-// 		Fun:  addChanFunc,
-// 		Args: []Expr{sendStmt.Chan},
-// 	}
-// }
+	callRecieveExpression := &ast.CallExpr{
+		Fun:  recieveFunc,
+		Args: []ast.Expr{recvExpr.X},
+	}
 
-// func AddSendExprStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
-
-// }
+	return callRecieveExpression
+}

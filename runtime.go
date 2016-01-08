@@ -42,12 +42,19 @@ func (g *Glimmer) AddChan(ch interface{}) reflect.Value {
 func (g *Glimmer) Send(ch interface{}, value interface{}) {
 	mockChan := g.AddChan(ch)
 
+	println("sending ", value)
 	mockChan.Send(reflect.ValueOf(value))
 }
 
-func (g *Glimmer) Recieve(ch interface{}) (interface{}, bool) {
-	// chType := reflect.ValueOf(ch).Type().Elem()
+func (g *Glimmer) Recieve(ch interface{}) interface{} {
+	mockChan := g.AddChan(ch)
 
+	result, _ := mockChan.Recv()
+
+	return result.Interface()
+}
+
+func (g *Glimmer) RecieveWithBool(ch interface{}) (interface{}, bool) {
 	mockChan := g.AddChan(ch)
 
 	result, ok := mockChan.Recv()
