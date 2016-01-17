@@ -20,6 +20,19 @@ Once you've finished anotating, you just run the glimmer command-line tool and p
 
 Voila!
 
+# Front-end
+When Glimmer runs it starts a web server listening on port 9610. Just open ```localhost:9610``` to start watching the visualisation of your goroutines communicating. When Glimmer starts your program it will block the execution untill you start it from the front end. This is done in order to not miss the beginning of your program's visualisation. This behaviour can be altered by providing a ```--no-wait``` flag.
+
+# Flags
+    --no-wait            disables the initial block that stops the program untill you start it from the front-end
+    --port 10000         changes the default port of the web server that powers the front-end
+    --log /path/to/file  logs the JSON that is used for communication between the back-end and the front-end
+    --no-front-end       dissables the server that powers the front-end
+    --delay 1000         sets the default delay for messages in milliseconds
+    --sequentialize      sets the default mode to sequential
+    --examine-all        visualizes all goroutines, not just the ones that are annotated
+
+
 # State
 Still, ```Glimmer``` is in a very early state - totaly not ready for work
 
@@ -28,3 +41,4 @@ Apache License Version 2.0, January 2004
 
 
 See the LICENSE document in the project tree root for details.
+

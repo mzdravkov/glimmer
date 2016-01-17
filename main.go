@@ -7,6 +7,10 @@ import (
 	"go/token"
 )
 
+//TODO: find a good solution to the problem with hijiking only the channels
+// used in the annotated channels: Hijiking a channel and not writting to the original one
+// will cause all reads from the original channel in unannotated functions to hang forever
+
 func main() {
 	program := climax.New("glimmer")
 
