@@ -1,96 +1,88 @@
 package main
 
 import (
+	"fmt"
 	"reflect"
+	"runtime"
 	"sync"
 )
 
-type Channels struct {
-	Input, Output reflect.Value
+type ChanGuard struct {
+	Chan      interface{}
+	semaphore chan struct{}
+	sync.Mutex
 }
 
-type Glimmer struct {
-	Channels map[reflect.Value]*Channels
-	Mutex    *sync.Mutex
+func MakeChanGuard(ch interface{}) ChanGuard {
+	return ChanGuard{
+		Chan:      ch,
+		semaphore: make(chan struct{}),
+	}
 }
 
-var glimmer Glimmer
+func (cg *ChanGuard) Recieve(ch interface{}) interface{} {
+	<-cg.semaphore
 
-func init() {
-	glimmer = Glimmer{
-		Channels: make(map[reflect.Value]*Channels),
+	// TODO: PROCESS RECIEVE EVENT
+
+	cg.Lock()
+	defer cg.Unlock()
+
+	// get the caller of the Recieve function
+	programCounter, _, _, ok := runtime.Caller(1)
+	if !ok {
+		panic("Can't read the stack trace to find who called the Recieve function. Have no idea how to handle this.")
 	}
 
-	glimmer.StartTransponder()
+	caller := runtime.FuncForPC(programCounter)
+	fmt.Println("Recieve called from", caller.Name())
+
+	result, _ := reflect.ValueOf(ch).Recv()
+
+	return result
 }
 
-//TODO: find a good way to optimize this to not take all the channels from scratch every time
-func (g *Glimmer) StartTransponder() {
-	go func() {
-		for {
-			keys := make([]reflect.SelectCase, len(g.Channels))
-			for key := range g.Channels {
-				selectCase := reflect.SelectCase{Dir: reflect.SelectRecv, Chan: key}
-				keys = append(keys, selectCase)
-			}
+func (cg *ChanGuard) RecieveWithBool(ch interface{}) (interface{}, bool) {
+	<-cg.semaphore
 
-			chosen, inputMessage, _ := reflect.Select(keys)
+	// TODO: PROCESS RECIEVE EVENT
 
-			outputMessage := g.ProcessMessage(inputMessage)
+	cg.Lock()
+	defer cg.Unlock()
 
-			g.Channels[keys[chosen].Chan].Output.Send(outputMessage)
-		}
-	}()
+	// get the caller of the RecieveWiwSithBool function
+	programCounter, _, _, ok := runtime.Caller(1)
+	if !ok {
+		panic("Can't read the stack trace to find who called the RecieveWithBool function. Have no idea how to handle this.")
+	}
+
+	caller := runtime.FuncForPC(programCounter)
+	fmt.Println("RecieveWithBool called from", caller.Name())
+
+	return reflect.ValueOf(ch).Recv()
+}
+
+func (cg *ChanGuard) Send(ch interface{}, value interface{}) {
+	cg.semaphore <- struct{}{}
+
+	// TODO: PROCESS SEND EVENT
+
+	cg.Lock()
+	defer cg.Unlock()
+
+	// get the caller of the Send function
+	programCounter, _, _, ok := runtime.Caller(1)
+	if !ok {
+		panic("Can't read the stack trace to find who called the Send function. Have no idea how to handle this.")
+	}
+
+	caller := runtime.FuncForPC(programCounter)
+	fmt.Println("Send called from", caller.Name())
+
+	reflect.ValueOf(ch).Send(reflect.ValueOf(value))
 }
 
 //TODO
-func (g *Glimmer) ProcessMessage(message reflect.Value) reflect.Value {
+func ProcessMessage(message reflect.Value) reflect.Value {
 	return message
-}
-
-//TODO shoild I make a DeleteChan method that to be invoked on delete(chan) calls?
-func (g *Glimmer) AddChan(ch interface{}) *Channels {
-	key := reflect.ValueOf(ch)
-
-	g.Mutex.Lock()
-	defer func() { g.Mutex.Unlock() }()
-
-	if mockChannels, ok := g.Channels[key]; ok {
-		return mockChannels
-	}
-
-	chType := reflect.TypeOf(ch).Elem()
-
-	inputChan := reflect.MakeChan(chType, reflect.ValueOf(ch).Cap())
-	outputChan := reflect.MakeChan(chType, reflect.ValueOf(ch).Cap())
-
-	g.Channels[key] = &Channels{Input: inputChan, Output: outputChan}
-
-	return g.Channels[key]
-}
-
-// this will be called from the modified client's code
-func (g *Glimmer) Send(ch interface{}, value interface{}) {
-	mockChan := g.AddChan(ch)
-
-	println("sending ", value)
-	mockChan.Input.Send(reflect.ValueOf(value))
-}
-
-// this will be called from the modified client's code
-func (g *Glimmer) Recieve(ch interface{}) interface{} {
-	mockChan := g.AddChan(ch)
-
-	result, _ := mockChan.Output.Recv()
-
-	return result.Interface()
-}
-
-// this will be called from the modified client's code
-func (g *Glimmer) RecieveWithBool(ch interface{}) (interface{}, bool) {
-	mockChan := g.AddChan(ch)
-
-	result, ok := mockChan.Output.Recv()
-
-	return result.Interface(), ok
 }

@@ -42,6 +42,7 @@ func testFunc() {
 	ch := make(chan int, 2)
 	ch <- 1
 	<-ch
+	println(len(ch))
 }
 
 func run(path string) {

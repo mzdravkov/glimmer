@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	// "reflect"
 )
 
 type FuncDeclFinder struct{}
@@ -20,43 +21,112 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 		if n.Doc == nil {
 			return nil
 		}
-		// prune search if function has number of comment lines different than one
-		if len(n.Doc.List) != 1 {
+
+		// prune search if there is no line in the comment group that is a glimmer annotation
+		isAnnotated := false
+		for _, v := range n.Doc.List {
+			if v.Text == "// glimmer" || v.Text == "//glimmer" {
+				isAnnotated = true
+				break
+			}
+		}
+		if !isAnnotated {
 			return nil
 		}
-		// prune search if this one comment line is not the one we need
-		if n.Doc.List[0].Text != "// glimmer" {
-			return nil
-		}
+
 		fmt.Println(n.Name)
-		sendOrReceiveRewriter := new(SendOrReceiveRewriter)
-		gorewrite.Rewrite(sendOrReceiveRewriter, n.Body)
+
+		chanOperationsRewriter := new(ChanOperationsRewriter)
+		gorewrite.Rewrite(chanOperationsRewriter, n.Body)
+
 		return nil // Prune search
 	}
 
 	return nil // Prune search
 }
 
-type SendOrReceiveRewriter struct{}
+type ChanOperationsRewriter struct{}
 
 // Visit implements the ast.Visitor interface.
-func (f *SendOrReceiveRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
+func (f *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
 	switch n := node.(type) {
 	case *ast.SendStmt:
-		fmt.Println("send to channl: ", n)
-		return AddSendExprStmt(n), nil
+		fmt.Println("send to channel: ", n)
+		return AddSendStmt(n), nil
 	case *ast.UnaryExpr:
 		// if we have a reading from channel
 		if n.Op == token.ARROW {
 			fmt.Println("receive from channel: ", n)
-			return AddRecvExprStmt(n), nil
+			return AddRecvExpr(n), nil
 		}
 		//TODO: make a special case for result, ok := <-ch
+	case *ast.CallExpr:
+		// TODO: investigate whether there isn't a better approach to do this than sprintf
+		switch fmt.Sprintf("%s", n.Fun) {
+		case "make":
+			fmt.Println("make")
+			return RewriteMakeCall(n), nil
+		case "len":
+			fmt.Println("len")
+			return RewriteLenCall(n), nil
+		case "cap":
+			fmt.Println("cap")
+			return RewriteCapCall(n), nil
+		case "close":
+			fmt.Println("close")
+		}
 	}
 	return node, f
 }
 
-func AddSendExprStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
+func RewriteMakeCall(makeCall *ast.CallExpr) *ast.CallExpr {
+	MakeChanGuardExpr, err := parser.ParseExpr("MakeChanGuard")
+	if err != nil {
+		panic("Can't create expression for calling MakeChanGuard")
+	}
+
+	makeChanGuardCall := &ast.CallExpr{
+		Fun:  MakeChanGuardExpr,
+		Args: []ast.Expr{makeCall},
+	}
+
+	return makeChanGuardCall
+}
+
+func RewriteLenCall(lenCall *ast.CallExpr) *ast.CallExpr {
+	newArgument, err := parser.ParseExpr(fmt.Sprintf("%s.%s", lenCall.Args[0], "Chan"))
+	if err != nil {
+		panic("Can't create new argument for a len() call")
+	}
+
+	lenCall.Args[0] = newArgument
+
+	return lenCall
+}
+
+func RewriteCapCall(capCall *ast.CallExpr) *ast.CallExpr {
+	newArgument, err := parser.ParseExpr(fmt.Sprintf("%s.%s", capCall.Args[0], "Chan"))
+	if err != nil {
+		panic("Can't create new argument for a cap() call")
+	}
+
+	capCall.Args[0] = newArgument
+
+	return capCall
+}
+
+func RewriteCloseCall(closeCall *ast.CallExpr) *ast.CallExpr {
+	newArgument, err := parser.ParseExpr(fmt.Sprintf("%s.%s", closeCall.Args[0], "Chan"))
+	if err != nil {
+		panic("Can't create new argument for a cap() call")
+	}
+
+	closeCall.Args[0] = newArgument
+
+	return closeCall
+}
+
+func AddSendStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
 	sendFunc, err := parser.ParseExpr("glimmer.Send")
 	if err != nil {
 		panic("can't parse glimmer.Send expression")
@@ -70,7 +140,7 @@ func AddSendExprStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
 	return &ast.ExprStmt{X: callSendExpression}
 }
 
-func AddRecvExprStmt(recvExpr *ast.UnaryExpr) ast.Expr {
+func AddRecvExpr(recvExpr *ast.UnaryExpr) ast.Expr {
 	recieveFunc, err := parser.ParseExpr("glimmer.Recieve")
 	if err != nil {
 		panic("can't parse glimmer.Receive expression")
