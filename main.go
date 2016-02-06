@@ -1,10 +1,16 @@
 package main
 
 import (
+	"bytes"
+	// "fmt"
 	"github.com/tucnak/climax"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 )
 
 //TODO: find a good solution to the problem with hijiking only the channels
@@ -53,10 +59,18 @@ func run(path string) {
 		panic(err)
 	}
 
+	os.Mkdir("glimmer_tmp", os.ModePerm)
+
 	funcDeclFinder := new(FuncDeclFinder)
 	for _, pkg := range packages {
-		for _, file := range pkg.Files {
+		for filename, file := range pkg.Files {
 			ast.Walk(funcDeclFinder, file)
+
+			// export the ast to a file in glimmer_tmp directory
+			var buf bytes.Buffer
+			printer.Fprint(&buf, fset, file)
+			fileName := filepath.Join("glimmer_tmp", filename)
+			ioutil.WriteFile(fileName, buf.Bytes(), os.ModePerm)
 		}
 	}
 }

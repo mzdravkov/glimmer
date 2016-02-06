@@ -64,16 +64,13 @@ func (f *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rew
 		// TODO: investigate whether there isn't a better approach to do this than sprintf
 		switch fmt.Sprintf("%s", n.Fun) {
 		case "make":
-			fmt.Println("make")
 			return RewriteMakeCall(n), nil
 		case "len":
-			fmt.Println("len")
 			return RewriteLenCall(n), nil
 		case "cap":
-			fmt.Println("cap")
 			return RewriteCapCall(n), nil
 		case "close":
-			fmt.Println("close")
+			return RewriteCloseCall(n), nil
 		}
 	}
 	return node, f
