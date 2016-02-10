@@ -22,7 +22,7 @@ func MakeChanGuard(ch interface{}) ChanGuard {
 	}
 }
 
-func (cg *ChanGuard) Recieve(ch interface{}) interface{} {
+func (cg *ChanGuard) Recieve() interface{} {
 	<-cg.semaphore
 
 	// TODO: PROCESS RECIEVE EVENT
@@ -39,12 +39,12 @@ func (cg *ChanGuard) Recieve(ch interface{}) interface{} {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("Recieve called from", caller.Name())
 
-	result, _ := reflect.ValueOf(ch).Recv()
+	result, _ := reflect.ValueOf(cg.Chan).Recv()
 
 	return result
 }
 
-func (cg *ChanGuard) RecieveWithBool(ch interface{}) (interface{}, bool) {
+func (cg *ChanGuard) RecieveWithBool() (interface{}, bool) {
 	<-cg.semaphore
 
 	// TODO: PROCESS RECIEVE EVENT
@@ -61,10 +61,10 @@ func (cg *ChanGuard) RecieveWithBool(ch interface{}) (interface{}, bool) {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("RecieveWithBool called from", caller.Name())
 
-	return reflect.ValueOf(ch).Recv()
+	return reflect.ValueOf(cg.Chan).Recv()
 }
 
-func (cg *ChanGuard) Send(ch interface{}, value interface{}) {
+func (cg *ChanGuard) Send(value interface{}) {
 	cg.semaphore <- struct{}{}
 
 	// TODO: PROCESS SEND EVENT
@@ -81,7 +81,7 @@ func (cg *ChanGuard) Send(ch interface{}, value interface{}) {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("Send called from", caller.Name())
 
-	reflect.ValueOf(ch).Send(reflect.ValueOf(value))
+	reflect.ValueOf(cg.Chan).Send(reflect.ValueOf(value))
 }
 
 func (cg *ChanGuard) Len() int {

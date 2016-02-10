@@ -131,31 +131,30 @@ func RewriteCloseCall(closeCall *ast.CallExpr) *ast.CallExpr {
 }
 
 func AddSendStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
-	sendFunc, err := parser.ParseExpr("glimmer.Send")
+	expr := fmt.Sprintf("%s.Send", sendStmt.Chan)
+	sendFunc, err := parser.ParseExpr(expr)
 	if err != nil {
 		panic("can't parse glimmer.Send expression")
 	}
 
 	callSendExpression := &ast.CallExpr{
 		Fun:  sendFunc,
-		Args: []ast.Expr{sendStmt.Chan, sendStmt.Value},
+		Args: []ast.Expr{sendStmt.Value},
 	}
 
 	return &ast.ExprStmt{X: callSendExpression}
 }
 
 func AddRecvExpr(recvExpr *ast.UnaryExpr) ast.Expr {
-	recieveFunc, err := parser.ParseExpr("glimmer.Recieve")
+	expr := fmt.Sprintf("%s.Recieve", recvExpr.X)
+	recieveFunc, err := parser.ParseExpr(expr)
 	if err != nil {
 		panic("can't parse glimmer.Receive expression")
 	}
 
-	callRecieveExpression := &ast.CallExpr{
-		Fun:  recieveFunc,
-		Args: []ast.Expr{recvExpr.X},
+	return &ast.CallExpr{
+		Fun: recieveFunc,
 	}
-
-	return callRecieveExpression
 }
 
 func AddGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
