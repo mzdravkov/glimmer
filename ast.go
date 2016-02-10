@@ -9,27 +9,7 @@ import (
 	"golang.org/x/tools/go/ast/astutil"
 
 	"github.com/tsuna/gorewrite"
-	// "reflect"
 )
-
-// type GlimmerRuntimeImportAdder struct{}
-
-// func (f *GlimmerRuntimeImportAdder) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
-// 	switch n := node.(type) {
-// 	case *ast.File:
-// 		return node, f
-// 	case *ast.ImportSpec:
-// 		glimmerImport := &ast.ImportSpec{
-// 			Path: &ast.BasicLit{
-// 				Kind:  token.STRING,
-// 				Value: "github.com/mzdravkov/glimmer/runtime",
-// 			},
-// 		}
-// 		n = append(n.Imports, glimmerImport)
-// 		return n, nil
-// 	}
-// 	return node, nil
-// }
 
 type FuncDeclFinder struct{}
 
@@ -98,7 +78,7 @@ func (f *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rew
 }
 
 func RewriteMakeCall(makeCall *ast.CallExpr) *ast.CallExpr {
-	MakeChanGuardExpr, err := parser.ParseExpr("MakeChanGuard")
+	MakeChanGuardExpr, err := parser.ParseExpr("glimmer.MakeChanGuard")
 	if err != nil {
 		panic("Can't create expression for calling MakeChanGuard")
 	}
@@ -112,36 +92,42 @@ func RewriteMakeCall(makeCall *ast.CallExpr) *ast.CallExpr {
 }
 
 func RewriteLenCall(lenCall *ast.CallExpr) *ast.CallExpr {
-	newArgument, err := parser.ParseExpr(fmt.Sprintf("%s.%s", lenCall.Args[0], "Chan"))
+	expr := fmt.Sprintf("%s.Len", lenCall.Args[0])
+	newLenCall, err := parser.ParseExpr(expr)
 	if err != nil {
-		panic("Can't create new argument for a len() call")
+		fmt.Println("Can't create new len() call:")
+		panic(err)
 	}
 
-	lenCall.Args[0] = newArgument
-
-	return lenCall
+	return &ast.CallExpr{
+		Fun: newLenCall,
+	}
 }
 
 func RewriteCapCall(capCall *ast.CallExpr) *ast.CallExpr {
-	newArgument, err := parser.ParseExpr(fmt.Sprintf("%s.%s", capCall.Args[0], "Chan"))
+	expr := fmt.Sprintf("%s.Cap", capCall.Args[0])
+	newCapCall, err := parser.ParseExpr(expr)
 	if err != nil {
-		panic("Can't create new argument for a cap() call")
+		fmt.Println("Can't create new cap() call:")
+		panic(err)
 	}
 
-	capCall.Args[0] = newArgument
-
-	return capCall
+	return &ast.CallExpr{
+		Fun: newCapCall,
+	}
 }
 
 func RewriteCloseCall(closeCall *ast.CallExpr) *ast.CallExpr {
-	newArgument, err := parser.ParseExpr(fmt.Sprintf("%s.%s", closeCall.Args[0], "Chan"))
+	expr := fmt.Sprintf("%s.Close", closeCall.Args[0])
+	newCloseCall, err := parser.ParseExpr(expr)
 	if err != nil {
-		panic("Can't create new argument for a cap() call")
+		fmt.Println("Can't create new close() call:")
+		panic(err)
 	}
 
-	closeCall.Args[0] = newArgument
-
-	return closeCall
+	return &ast.CallExpr{
+		Fun: newCloseCall,
+	}
 }
 
 func AddSendStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
@@ -175,7 +161,7 @@ func AddRecvExpr(recvExpr *ast.UnaryExpr) ast.Expr {
 func AddGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
 	for _, pkg := range packages {
 		for _, file := range pkg.Files {
-			astutil.AddImport(fset, file, "github.com/mzdravkov/glimmer/glimmer")
+			astutil.AddNamedImport(fset, file, "glimmer", "github.com/mzdravkov/glimmer/runtime")
 		}
 	}
 }

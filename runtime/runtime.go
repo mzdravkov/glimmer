@@ -1,4 +1,4 @@
-package glimmer
+package runtime
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 
 type ChanGuard struct {
 	Chan      interface{}
+	Type      reflect.Type
 	semaphore chan struct{}
 	sync.Mutex
 }
@@ -16,6 +17,7 @@ type ChanGuard struct {
 func MakeChanGuard(ch interface{}) ChanGuard {
 	return ChanGuard{
 		Chan:      ch,
+		Type:      reflect.ValueOf(ch).Type(),
 		semaphore: make(chan struct{}),
 	}
 }
@@ -80,6 +82,18 @@ func (cg *ChanGuard) Send(ch interface{}, value interface{}) {
 	fmt.Println("Send called from", caller.Name())
 
 	reflect.ValueOf(ch).Send(reflect.ValueOf(value))
+}
+
+func (cg *ChanGuard) Len() int {
+	return reflect.ValueOf(cg.Chan).Len()
+}
+
+func (cg *ChanGuard) Cap() int {
+	return reflect.ValueOf(cg.Chan).Cap()
+}
+
+func (cg *ChanGuard) Close() {
+	reflect.ValueOf(cg.Chan).Close()
 }
 
 //TODO
