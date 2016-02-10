@@ -76,10 +76,11 @@ func run(path string) {
 			newFileName := filepath.Join(glimmerTmpFolderPath, fileName)
 			ioutil.WriteFile(newFileName, buf.Bytes(), os.ModePerm)
 
-			// run goimports on glimmerTmpFolder to remove the glimmer runtime import from files where it is not used
-			if exec.Command("sh", "-c", "goimports", "-w", glimmerTmpFolderPath).Run() != nil {
-				panic("Couldn't run goimports on the generated source code")
-			}
 		}
+	}
+
+	// run goimports on glimmerTmpFolder to remove the glimmer runtime import from files where it is not used
+	if exec.Command("goimports", "-w", glimmerTmpFolderPath).Run() != nil {
+		panic("Couldn't run goimports on the generated source code")
 	}
 }

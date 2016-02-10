@@ -95,7 +95,7 @@ func RewriteLenCall(lenCall *ast.CallExpr) *ast.CallExpr {
 	expr := fmt.Sprintf("%s.Len", lenCall.Args[0])
 	newLenCall, err := parser.ParseExpr(expr)
 	if err != nil {
-		fmt.Println("Can't create new len() call:")
+		fmt.Println("Can't create a new len() call:")
 		panic(err)
 	}
 
@@ -108,7 +108,7 @@ func RewriteCapCall(capCall *ast.CallExpr) *ast.CallExpr {
 	expr := fmt.Sprintf("%s.Cap", capCall.Args[0])
 	newCapCall, err := parser.ParseExpr(expr)
 	if err != nil {
-		fmt.Println("Can't create new cap() call:")
+		fmt.Println("Can't create a new cap() call:")
 		panic(err)
 	}
 
@@ -121,7 +121,7 @@ func RewriteCloseCall(closeCall *ast.CallExpr) *ast.CallExpr {
 	expr := fmt.Sprintf("%s.Close", closeCall.Args[0])
 	newCloseCall, err := parser.ParseExpr(expr)
 	if err != nil {
-		fmt.Println("Can't create new close() call:")
+		fmt.Println("Can't create a new close() call:")
 		panic(err)
 	}
 
@@ -161,7 +161,7 @@ func AddRecvExpr(recvExpr *ast.UnaryExpr) ast.Expr {
 func AddGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
 	for _, pkg := range packages {
 		for _, file := range pkg.Files {
-			astutil.AddNamedImport(fset, file, "glimmer", "github.com/mzdravkov/glimmer/runtime")
+			astutil.AddNamedImport(fset, file, "glimmer", "github.com/mzdravkov/glimmer/inject")
 		}
 	}
 }
