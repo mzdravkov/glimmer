@@ -2,15 +2,16 @@ package main
 
 import (
 	"bytes"
-	// "fmt"
-	"github.com/tucnak/climax"
 	"go/ast"
 	"go/parser"
 	"go/printer"
 	"go/token"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
+
+	"github.com/tucnak/climax"
 )
 
 //TODO: find a good solution to the problem with hijiking only the channels
@@ -59,18 +60,26 @@ func run(path string) {
 		panic(err)
 	}
 
-	os.Mkdir("glimmer_tmp", os.ModePerm)
+	glimmerTmpFolderPath := filepath.Join(path, "glimmer_tmp")
+	os.Mkdir(glimmerTmpFolderPath, os.ModePerm)
 
 	funcDeclFinder := new(FuncDeclFinder)
 	for _, pkg := range packages {
-		for filename, file := range pkg.Files {
+		for fileName, file := range pkg.Files {
+			AddGlimmerImports(fset, packages)
+
 			ast.Walk(funcDeclFinder, file)
 
 			// export the ast to a file in glimmer_tmp directory
 			var buf bytes.Buffer
 			printer.Fprint(&buf, fset, file)
-			fileName := filepath.Join("glimmer_tmp", filename)
-			ioutil.WriteFile(fileName, buf.Bytes(), os.ModePerm)
+			newFileName := filepath.Join(glimmerTmpFolderPath, fileName)
+			ioutil.WriteFile(newFileName, buf.Bytes(), os.ModePerm)
+
+			// run goimports on glimmerTmpFolder to remove the glimmer runtime import from files where it is not used
+			if exec.Command("sh", "-c", "goimports", "-w", glimmerTmpFolderPath).Run() != nil {
+				panic("Couldn't run goimports on the generated source code")
+			}
 		}
 	}
 }

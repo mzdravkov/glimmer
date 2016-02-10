@@ -2,12 +2,34 @@ package main
 
 import (
 	"fmt"
-	"github.com/tsuna/gorewrite"
 	"go/ast"
 	"go/parser"
 	"go/token"
+
+	"golang.org/x/tools/go/ast/astutil"
+
+	"github.com/tsuna/gorewrite"
 	// "reflect"
 )
+
+// type GlimmerRuntimeImportAdder struct{}
+
+// func (f *GlimmerRuntimeImportAdder) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
+// 	switch n := node.(type) {
+// 	case *ast.File:
+// 		return node, f
+// 	case *ast.ImportSpec:
+// 		glimmerImport := &ast.ImportSpec{
+// 			Path: &ast.BasicLit{
+// 				Kind:  token.STRING,
+// 				Value: "github.com/mzdravkov/glimmer/runtime",
+// 			},
+// 		}
+// 		n = append(n.Imports, glimmerImport)
+// 		return n, nil
+// 	}
+// 	return node, nil
+// }
 
 type FuncDeclFinder struct{}
 
@@ -47,7 +69,6 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 
 type ChanOperationsRewriter struct{}
 
-// Visit implements the ast.Visitor interface.
 func (f *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
 	switch n := node.(type) {
 	case *ast.SendStmt:
@@ -149,4 +170,12 @@ func AddRecvExpr(recvExpr *ast.UnaryExpr) ast.Expr {
 	}
 
 	return callRecieveExpression
+}
+
+func AddGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
+	for _, pkg := range packages {
+		for _, file := range pkg.Files {
+			astutil.AddImport(fset, file, "github.com/mzdravkov/glimmer/glimmer")
+		}
+	}
 }
