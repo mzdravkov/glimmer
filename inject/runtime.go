@@ -11,7 +11,8 @@ type ChanGuard struct {
 	Chan      interface{}
 	Type      reflect.Type
 	semaphore chan struct{}
-	sync.Mutex
+	RecvLock  sync.Mutex
+	SendLock  sync.Mutex
 }
 
 func MakeChanGuard(ch interface{}) ChanGuard {
@@ -23,12 +24,14 @@ func MakeChanGuard(ch interface{}) ChanGuard {
 }
 
 func (cg *ChanGuard) Recieve() interface{} {
-	<-cg.semaphore
+	if cg.Cap() == 0 {
+		<-cg.semaphore
+	}
 
 	// TODO: PROCESS RECIEVE EVENT
 
-	cg.Lock()
-	defer cg.Unlock()
+	cg.RecvLock.Lock()
+	defer cg.RecvLock.Unlock()
 
 	// get the caller of the Recieve function
 	programCounter, _, _, ok := runtime.Caller(1)
@@ -45,12 +48,14 @@ func (cg *ChanGuard) Recieve() interface{} {
 }
 
 func (cg *ChanGuard) RecieveWithBool() (interface{}, bool) {
-	<-cg.semaphore
+	if cg.Cap() == 0 {
+		<-cg.semaphore
+	}
 
 	// TODO: PROCESS RECIEVE EVENT
 
-	cg.Lock()
-	defer cg.Unlock()
+	cg.RecvLock.Lock()
+	defer cg.RecvLock.Unlock()
 
 	// get the caller of the RecieveWiwSithBool function
 	programCounter, _, _, ok := runtime.Caller(1)
@@ -65,12 +70,14 @@ func (cg *ChanGuard) RecieveWithBool() (interface{}, bool) {
 }
 
 func (cg *ChanGuard) Send(value interface{}) {
-	cg.semaphore <- struct{}{}
+	if cg.Cap() == 0 {
+		cg.semaphore <- struct{}{}
+	}
 
 	// TODO: PROCESS SEND EVENT
 
-	cg.Lock()
-	defer cg.Unlock()
+	cg.SendLock.Lock()
+	defer cg.SendLock.Unlock()
 
 	// get the caller of the Send function
 	programCounter, _, _, ok := runtime.Caller(1)
