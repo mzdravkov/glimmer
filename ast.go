@@ -118,17 +118,26 @@ func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
 	if err != nil {
 		panic("Can't parse rhs expression for an assignment stmt inside recieve function")
 	}
-	processRecievedValueFunc, err := parser.ParseExpr("glimmer.ProcessRecievedValue")
+	processRecieveFunc, err := parser.ParseExpr("glimmer.ProcessRecieve")
 	if err != nil {
-		panic("Can't parse callProcessRecievedValueExprStmt")
+		panic("Can't parse callProcessRecieveFunc")
 	}
 	chExpr, err := parser.ParseExpr("ch")
 	if err != nil {
 		panic("Can't parse 'ch' expression")
 	}
+	sleepFunc, err := parser.ParseExpr("glimmer.Sleep")
+	if err != nil {
+		panic("Can't parse glimmer.Sleep expression")
+	}
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
+			&ast.ExprStmt{
+				X: &ast.CallExpr{
+					Fun: sleepFunc,
+				},
+			},
 			&ast.AssignStmt{
 				Lhs: []ast.Expr{assignStmtLhs},
 				Tok: token.DEFINE,
@@ -136,7 +145,7 @@ func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
 			},
 			&ast.ExprStmt{
 				X: &ast.CallExpr{
-					Fun:  processRecievedValueFunc,
+					Fun:  processRecieveFunc,
 					Args: []ast.Expr{chExpr, assignStmtLhs},
 				},
 			},
@@ -173,17 +182,26 @@ func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 	if err != nil {
 		panic("Can't parse rhs expression for an assignment stmt inside recieve function")
 	}
-	processRecievedValueFunc, err := parser.ParseExpr("glimmer.ProcessRecievedValue")
+	processRecieveFunc, err := parser.ParseExpr("glimmer.ProcessRecieve")
 	if err != nil {
-		panic("Can't parse callProcessRecievedValueExprStmt")
+		panic("Can't parse ProcessRecieveFunc")
 	}
 	chExpr, err := parser.ParseExpr("ch")
 	if err != nil {
 		panic("Can't parse 'ch' expression")
 	}
+	sleepFunc, err := parser.ParseExpr("glimmer.Sleep")
+	if err != nil {
+		panic("Can't parse glimmer.Sleep expression")
+	}
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
+			&ast.ExprStmt{
+				X: &ast.CallExpr{
+					Fun: sleepFunc,
+				},
+			},
 			&ast.AssignStmt{
 				Lhs: []ast.Expr{assignStmtLhsValue, assignStmtLhsOk},
 				Tok: token.DEFINE,
@@ -191,7 +209,7 @@ func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 			},
 			&ast.ExprStmt{
 				X: &ast.CallExpr{
-					Fun:  processRecievedValueFunc,
+					Fun:  processRecieveFunc,
 					Args: []ast.Expr{chExpr, assignStmtLhsValue},
 				},
 			},
@@ -262,7 +280,7 @@ func createRecieveFuncType(chType types.Type, withBool bool) *ast.FuncType {
 }
 
 // Creates a function that serves as a substitute for a send statement
-func createSendFunc(ch *ast.Expr, value *ast.Expr) *ast.FuncLit {
+func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 	chType := info.TypeOf(*ch)
 	if chType == nil {
 		log.Fatal("Can't get the type of a channel in a send statement")
@@ -310,19 +328,29 @@ func createSendFunc(ch *ast.Expr, value *ast.Expr) *ast.FuncLit {
 	if err != nil {
 		panic("Can't parse value expression")
 	}
-	processSendValueFunc, err := parser.ParseExpr("glimmer.ProcessSendValue")
+	processSendFunc, err := parser.ParseExpr("glimmer.ProcessSend")
 	if err != nil {
-		panic("Can't parse glimmer.ProcessSendValue reference")
+		panic("Can't parse glimmer.ProcessSend reference")
 	}
+	sleepFunc, err := parser.ParseExpr("glimmer.Sleep")
+	if err != nil {
+		panic("Can't parse glimmer.Sleep expression")
+	}
+
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
+			&ast.ExprStmt{
+				X: &ast.CallExpr{
+					Fun: sleepFunc,
+				},
+			},
 			&ast.SendStmt{
 				Chan:  chanExpr,
 				Value: valueExpr,
 			},
 			&ast.ExprStmt{
 				X: &ast.CallExpr{
-					Fun:  processSendValueFunc,
+					Fun:  processSendFunc,
 					Args: []ast.Expr{chanExpr, valueExpr},
 				},
 			},
