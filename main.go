@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"go/types"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +55,12 @@ func testFunc() {
 	println(len(ch))
 }
 
+var info types.Info = types.Info{
+	Types: make(map[ast.Expr]types.TypeAndValue),
+	Defs:  make(map[*ast.Ident]types.Object),
+	Uses:  make(map[*ast.Ident]types.Object),
+}
+
 func run(path string) {
 	fset := token.NewFileSet()
 
@@ -62,6 +71,24 @@ func run(path string) {
 
 	glimmerTmpFolderPath := filepath.Join(path, "glimmer_tmp")
 	os.Mkdir(glimmerTmpFolderPath, os.ModePerm)
+
+	conf := types.Config{
+		Importer: importer.Default(),
+	}
+
+	// we invoke the type checker for each package and
+	// store the data in the types.Info structure
+	for _, pkg := range packages {
+		files := make([]*ast.File, 0, len(pkg.Files))
+
+		for _, value := range pkg.Files {
+			files = append(files, value)
+		}
+		_, err := conf.Check(path, fset, files, &info)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	funcDeclFinder := new(FuncDeclFinder)
 	for _, pkg := range packages {

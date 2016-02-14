@@ -5,6 +5,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
+	"log"
 
 	"golang.org/x/tools/go/ast/astutil"
 
@@ -14,6 +16,7 @@ import (
 type FuncDeclFinder struct{}
 
 // Visit implements the ast.Visitor interface.
+// it searches for function declarations with a glimmer annotation
 func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 	switch n := node.(type) {
 	case *ast.File:
@@ -36,8 +39,6 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 			return nil
 		}
 
-		fmt.Println(n.Name)
-
 		chanOperationsRewriter := new(ChanOperationsRewriter)
 		gorewrite.Rewrite(chanOperationsRewriter, n.Body)
 
@@ -49,118 +50,287 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 
 type ChanOperationsRewriter struct{}
 
-func (f *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
+// Rewrite implements the gorewrite.Rewriter interface.
+// it should be called for a function body node and it
+// searches for send and recieve statement and rewrites them
+// to log the event of communication
+func (r *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
 	switch n := node.(type) {
 	case *ast.SendStmt:
 		fmt.Println("send to channel: ", n)
+		fmt.Println(info.TypeOf(n.Chan))
 		return AddSendStmt(n), nil
 	case *ast.UnaryExpr:
 		// if we have a reading from channel
 		if n.Op == token.ARROW {
 			fmt.Println("receive from channel: ", n)
+			fmt.Println(info.TypeOf(n.X))
 			return AddRecvExpr(n), nil
 		}
 		//TODO: make a special case for result, ok := <-ch
-	case *ast.CallExpr:
-		// TODO: investigate whether there isn't a better approach to do this than sprintf
-		switch fmt.Sprintf("%s", n.Fun) {
-		case "make":
-			return RewriteMakeCall(n), nil
-		case "len":
-			return RewriteLenCall(n), nil
-		case "cap":
-			return RewriteCapCall(n), nil
-		case "close":
-			return RewriteCloseCall(n), nil
-		}
 	}
-	return node, f
+	return node, r
 }
 
-func RewriteMakeCall(makeCall *ast.CallExpr) *ast.CallExpr {
-	MakeChanGuardExpr, err := parser.ParseExpr("glimmer.MakeChanGuard")
-	if err != nil {
-		panic("Can't create expression for calling MakeChanGuard")
-	}
-
-	makeChanGuardCall := &ast.CallExpr{
-		Fun:  MakeChanGuardExpr,
-		Args: []ast.Expr{makeCall},
-	}
-
-	return makeChanGuardCall
-}
-
-func RewriteLenCall(lenCall *ast.CallExpr) *ast.CallExpr {
-	expr := fmt.Sprintf("%s.Len", lenCall.Args[0])
-	newLenCall, err := parser.ParseExpr(expr)
-	if err != nil {
-		fmt.Println("Can't create a new len() call:")
-		panic(err)
-	}
-
-	return &ast.CallExpr{
-		Fun: newLenCall,
-	}
-}
-
-func RewriteCapCall(capCall *ast.CallExpr) *ast.CallExpr {
-	expr := fmt.Sprintf("%s.Cap", capCall.Args[0])
-	newCapCall, err := parser.ParseExpr(expr)
-	if err != nil {
-		fmt.Println("Can't create a new cap() call:")
-		panic(err)
-	}
-
-	return &ast.CallExpr{
-		Fun: newCapCall,
-	}
-}
-
-func RewriteCloseCall(closeCall *ast.CallExpr) *ast.CallExpr {
-	expr := fmt.Sprintf("%s.Close", closeCall.Args[0])
-	newCloseCall, err := parser.ParseExpr(expr)
-	if err != nil {
-		fmt.Println("Can't create a new close() call:")
-		panic(err)
-	}
-
-	return &ast.CallExpr{
-		Fun: newCloseCall,
-	}
-}
-
+// This returns the glimmer substitute of a send statement
 func AddSendStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
-	expr := fmt.Sprintf("%s.Send", sendStmt.Chan)
-	sendFunc, err := parser.ParseExpr(expr)
-	if err != nil {
-		panic("can't parse glimmer.Send expression")
-	}
-
 	callSendExpression := &ast.CallExpr{
-		Fun:  sendFunc,
-		Args: []ast.Expr{sendStmt.Value},
+		Fun:  createSendFunc(&sendStmt.Chan, &sendStmt.Value),
+		Args: []ast.Expr{sendStmt.Chan, sendStmt.Value},
 	}
 
-	return &ast.ExprStmt{X: callSendExpression}
+	return &ast.ExprStmt{
+		X: callSendExpression,
+	}
 }
 
-func AddRecvExpr(recvExpr *ast.UnaryExpr) ast.Expr {
-	expr := fmt.Sprintf("%s.Recieve", recvExpr.X)
-	recieveFunc, err := parser.ParseExpr(expr)
-	if err != nil {
-		panic("can't parse glimmer.Receive expression")
-	}
-
+// This returns the glimmer substitute of a recieve expression
+func AddRecvExpr(recvExpr *ast.UnaryExpr) *ast.CallExpr {
 	return &ast.CallExpr{
-		Fun: recieveFunc,
+		Fun:  createRecieveFunc(&recvExpr.X),
+		Args: []ast.Expr{recvExpr.X},
 	}
 }
 
+// Adds the glimmer runtime import to each file in the provided packages
 func AddGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
 	for _, pkg := range packages {
 		for _, file := range pkg.Files {
 			astutil.AddNamedImport(fset, file, "glimmer", "github.com/mzdravkov/glimmer/inject")
 		}
+	}
+}
+
+// Creates a function that serves as a substitute for a recieve expression
+func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
+	chType := info.TypeOf(*ch)
+	if chType == nil {
+		log.Fatal("Can't get the type of a channel in a recieve expression")
+	}
+
+	funcType := createRecieveFuncType(chType, false)
+
+	assignStmtLhs, err := parser.ParseExpr("value")
+	if err != nil {
+		panic("Can't parse lhs expression for an assignment stmt inside recieve function")
+	}
+	assignStmtRhs, err := parser.ParseExpr("<-ch")
+	if err != nil {
+		panic("Can't parse rhs expression for an assignment stmt inside recieve function")
+	}
+	processRecievedValueFunc, err := parser.ParseExpr("glimmer.ProcessRecievedValue")
+	if err != nil {
+		panic("Can't parse callProcessRecievedValueExprStmt")
+	}
+	chExpr, err := parser.ParseExpr("ch")
+	if err != nil {
+		panic("Can't parse 'ch' expression")
+	}
+
+	body := &ast.BlockStmt{
+		List: []ast.Stmt{
+			&ast.AssignStmt{
+				Lhs: []ast.Expr{assignStmtLhs},
+				Tok: token.DEFINE,
+				Rhs: []ast.Expr{assignStmtRhs},
+			},
+			&ast.ExprStmt{
+				X: &ast.CallExpr{
+					Fun:  processRecievedValueFunc,
+					Args: []ast.Expr{chExpr, assignStmtLhs},
+				},
+			},
+			&ast.ReturnStmt{
+				Results: []ast.Expr{assignStmtLhs},
+			},
+		},
+	}
+
+	return &ast.FuncLit{
+		Type: funcType,
+		Body: body,
+	}
+}
+
+// Creates a function that serves as a substitute for a recieve with bool expression
+func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
+	chType := info.TypeOf(*ch)
+	if chType == nil {
+		log.Fatal("Can't get the type of a channel in a recieve expression")
+	}
+
+	funcType := createRecieveFuncType(chType, true)
+
+	assignStmtLhsValue, err := parser.ParseExpr("value")
+	if err != nil {
+		panic("Can't parse lhs 'value' expression for an assignment stmt inside recieve function")
+	}
+	assignStmtLhsOk, err := parser.ParseExpr("ok")
+	if err != nil {
+		panic("Can't parse lhs 'ok' expression for an assignment stmt inside recieve function")
+	}
+	assignStmtRhs, err := parser.ParseExpr("<-ch")
+	if err != nil {
+		panic("Can't parse rhs expression for an assignment stmt inside recieve function")
+	}
+	processRecievedValueFunc, err := parser.ParseExpr("glimmer.ProcessRecievedValue")
+	if err != nil {
+		panic("Can't parse callProcessRecievedValueExprStmt")
+	}
+	chExpr, err := parser.ParseExpr("ch")
+	if err != nil {
+		panic("Can't parse 'ch' expression")
+	}
+
+	body := &ast.BlockStmt{
+		List: []ast.Stmt{
+			&ast.AssignStmt{
+				Lhs: []ast.Expr{assignStmtLhsValue, assignStmtLhsOk},
+				Tok: token.DEFINE,
+				Rhs: []ast.Expr{assignStmtRhs},
+			},
+			&ast.ExprStmt{
+				X: &ast.CallExpr{
+					Fun:  processRecievedValueFunc,
+					Args: []ast.Expr{chExpr, assignStmtLhsValue},
+				},
+			},
+			&ast.ReturnStmt{
+				Results: []ast.Expr{assignStmtLhsValue, assignStmtLhsOk},
+			},
+		},
+	}
+
+	return &ast.FuncLit{
+		Type: funcType,
+		Body: body,
+	}
+}
+
+// Creates an ast.FuncType with one argument, which is a channel type and
+// the return results are the element type of the channel and (if withBool is true)
+// a boolean value
+func createRecieveFuncType(chType types.Type, withBool bool) *ast.FuncType {
+	paramType, err := parser.ParseExpr(fmt.Sprintf("%s", chType))
+	if err != nil {
+		panic("Can't parse channel type for the parameter of a recieve function")
+	}
+	params := &ast.FieldList{
+		List: []*ast.Field{
+			&ast.Field{
+				Names: []*ast.Ident{&ast.Ident{Name: "ch"}},
+				Type:  paramType,
+			},
+		},
+	}
+
+	// TODO: when I was using reflect.Type instead of types.Type I could use
+	// chType.Elem() to get the type of the values for the channel.
+	// types.Type doesn't have such method and for now I can't find a better way
+	// to do this than to get the string representation and to remove the first
+	// "chan " from the string. It's highly recommended to find a good
+	// and not so hacky way to do this.
+	resultType, err := parser.ParseExpr(fmt.Sprintf("%s", chType.String()[5:]))
+	if err != nil {
+		panic("Can't parse channel element type for the return type of a recieve function")
+	}
+	results := &ast.FieldList{
+		List: []*ast.Field{
+			&ast.Field{
+				Names: []*ast.Ident{&ast.Ident{}},
+				Type:  resultType,
+			},
+		},
+	}
+
+	if withBool {
+		boolType, err := parser.ParseExpr("bool")
+		if err != nil {
+			panic("Can't parse bool type")
+		}
+		okResult := &ast.Field{
+			Names: []*ast.Ident{&ast.Ident{}},
+			Type:  boolType,
+		}
+		results.List = append(results.List, okResult)
+	}
+
+	return &ast.FuncType{
+		Params:  params,
+		Results: results,
+	}
+}
+
+// Creates a function that serves as a substitute for a send statement
+func createSendFunc(ch *ast.Expr, value *ast.Expr) *ast.FuncLit {
+	chType := info.TypeOf(*ch)
+	if chType == nil {
+		log.Fatal("Can't get the type of a channel in a send statement")
+	}
+	valueType := info.TypeOf(*value)
+	if valueType == nil {
+		log.Fatal("Can't get the type of a value in a send statement")
+	}
+
+	chanParamType, err := parser.ParseExpr(fmt.Sprintf("%s", chType))
+	if err != nil {
+		panic("Can't parse channel type for the parameter of a send function")
+	}
+	valueParamType, err := parser.ParseExpr(fmt.Sprintf("%s", valueType))
+	if err != nil {
+		panic("Can't parse value type for the paramater of a send function")
+	}
+	params := &ast.FieldList{
+		List: []*ast.Field{
+			&ast.Field{
+				Names: []*ast.Ident{&ast.Ident{Name: "ch"}},
+				Type:  chanParamType,
+			},
+			&ast.Field{
+				Names: []*ast.Ident{&ast.Ident{Name: "value"}},
+				Type:  valueParamType,
+			},
+		},
+	}
+
+	results := &ast.FieldList{
+		List: []*ast.Field{},
+	}
+
+	funcType := &ast.FuncType{
+		Params:  params,
+		Results: results,
+	}
+
+	chanExpr, err := parser.ParseExpr("ch")
+	if err != nil {
+		panic("Can't parse chan expression")
+	}
+	valueExpr, err := parser.ParseExpr("value")
+	if err != nil {
+		panic("Can't parse value expression")
+	}
+	processSendValueFunc, err := parser.ParseExpr("glimmer.ProcessSendValue")
+	if err != nil {
+		panic("Can't parse glimmer.ProcessSendValue reference")
+	}
+	body := &ast.BlockStmt{
+		List: []ast.Stmt{
+			&ast.SendStmt{
+				Chan:  chanExpr,
+				Value: valueExpr,
+			},
+			&ast.ExprStmt{
+				X: &ast.CallExpr{
+					Fun:  processSendValueFunc,
+					Args: []ast.Expr{chanExpr, valueExpr},
+				},
+			},
+		},
+	}
+
+	return &ast.FuncLit{
+		Type: funcType,
+		Body: body,
 	}
 }
