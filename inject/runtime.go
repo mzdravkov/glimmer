@@ -27,7 +27,7 @@ var (
 
 func init() {
 	// 1024 seems a reasonable buffer size for this
-	// TODO: consider using the channels with infinite buffers
+	// TODO-min: consider using the channels with infinite buffers
 	// from https://github.com/eapache/channels
 	forSendingQueue = make(chan *MessageEvent, 1024)
 }
@@ -48,6 +48,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		case m := <-forSendingQueue:
 			if err := conn.WriteJSON(<-forSendingQueue); err != nil {
 				log.Error(err)
+				// TODO-min: should I exit here?
 				return
 			}
 		}
