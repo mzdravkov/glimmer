@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"go/ast"
 	"go/importer"
 	"go/parser"
@@ -16,6 +17,10 @@ import (
 
 	"github.com/tucnak/climax"
 )
+
+// TODO: would glimmer work on a clean installation?
+// Are there any dependencies that are not packaged with it?
+// For example goimports?
 
 func main() {
 	program := climax.New("glimmer")
@@ -102,8 +107,33 @@ func run(path string) {
 		}
 	}
 
+	createAnotatedFunctionsFile(glimmerTmpFolderPath)
+
 	// run goimports on glimmerTmpFolder to remove the glimmer runtime import from files where it is not used
-	if exec.Command("goimports", "-w", glimmerTmpFolderPath).Run() != nil {
-		panic("Couldn't run goimports on the generated source code")
+	if err := exec.Command("goimports", "-w", glimmerTmpFolderPath).Run(); err != nil {
+		log.Fatal("Couldn't run goimports on the generated source code", err)
 	}
+
+	// compile the new modified version of the client's program
+	if os.Chdir(glimmerTmpFolderPath) != nil {
+		log.Fatal(err)
+	}
+
+	buildCommand := exec.Command("go", "build", "-o", "glimmer_tmp")
+	if err := buildCommand.Run(); err != nil {
+		log.Fatal("Couldn't run go build on the generated source code: ", err)
+	}
+}
+
+func createAnotatedFunctionsFile(dir string) {
+	s := struct {
+		Functions []string
+	}{annotatedFunctions}
+
+	data, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+
+	ioutil.WriteFile(filepath.Join(dir, "glimmer_functions.json"), data, os.ModePerm)
 }

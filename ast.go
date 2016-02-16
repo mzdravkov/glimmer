@@ -13,6 +13,8 @@ import (
 	"github.com/tsuna/gorewrite"
 )
 
+var annotatedFunctions []string = make([]string, 0)
+
 type FuncDeclFinder struct{}
 
 // Visit implements the ast.Visitor interface.
@@ -35,9 +37,12 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 				break
 			}
 		}
+
 		if !isAnnotated {
 			return nil
 		}
+
+		annotatedFunctions = append(annotatedFunctions, n.Name.Name)
 
 		chanOperationsRewriter := new(ChanOperationsRewriter)
 		gorewrite.Rewrite(chanOperationsRewriter, n.Body)

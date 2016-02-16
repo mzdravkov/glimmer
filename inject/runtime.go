@@ -11,6 +11,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// for debugging
+func init() {
+	go func() {
+		for {
+			fmt.Println(<-forSendingQueue)
+		}
+	}()
+}
+
 type MessageEvent struct {
 	Func  string
 	Type  bool // true is recieving, false is sending
@@ -36,7 +45,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	upgrader := websocket.Upgrader{}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Error(err)
+		log.Fatal(err)
 		return
 	}
 	defer conn.Close()
@@ -46,14 +55,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// TODO: read
 		// write message events to the websocket
 		case m := <-forSendingQueue:
-			if err := conn.WriteJSON(<-forSendingQueue); err != nil {
-				log.Error(err)
+			if err := conn.WriteJSON(m); err != nil {
+				log.Fatal(err)
 				// TODO-min: should I exit here?
 				return
 			}
 		}
 	}
 }
+
+// TODO#: the ch and value args to process functions
+// are being copied by value and the adresses are not correct
+// TODO value should not be send as pointer, right?
 
 func ProcessRecieve(ch, value interface{}) {
 	// get the caller of the caller of this function

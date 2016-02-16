@@ -44,3 +44,9 @@ function addRow(name) {
     }
   }
 }
+
+$( document ).ready(function() {
+  $.getJSON("glimmer_functions.json", function(data) {
+    alert(data);
+  });
+});
