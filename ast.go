@@ -115,46 +115,48 @@ func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
 
 	funcType := createRecieveFuncType(chType, false)
 
-	assignStmtLhs, err := parser.ParseExpr("value")
-	if err != nil {
-		panic("Can't parse lhs expression for an assignment stmt inside recieve function")
-	}
 	assignStmtRhs, err := parser.ParseExpr("<-ch")
 	if err != nil {
 		panic("Can't parse rhs expression for an assignment stmt inside recieve function")
 	}
+
 	processRecieveFunc, err := parser.ParseExpr("glimmer.ProcessRecieve")
 	if err != nil {
 		panic("Can't parse callProcessRecieveFunc")
 	}
-	chExpr, err := parser.ParseExpr("ch")
-	if err != nil {
-		panic("Can't parse 'ch' expression")
-	}
-	sleepFunc, err := parser.ParseExpr("glimmer.Sleep")
-	if err != nil {
-		panic("Can't parse glimmer.Sleep expression")
-	}
+
+	chExpr, assignStmtLhs, sleepFunc, reflectValueOf := getCommonExpressions()
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
-			&ast.ExprStmt{
+			&ast.ExprStmt{ // glimmer.Sleep()
 				X: &ast.CallExpr{
 					Fun: sleepFunc,
 				},
 			},
-			&ast.AssignStmt{
+			&ast.AssignStmt{ // value := <-ch
 				Lhs: []ast.Expr{assignStmtLhs},
 				Tok: token.DEFINE,
 				Rhs: []ast.Expr{assignStmtRhs},
 			},
-			&ast.ExprStmt{
+			&ast.ExprStmt{ // glimmer.ProcessRecieve(reflect.ValueOf(ch).Pointer(), value)
 				X: &ast.CallExpr{
-					Fun:  processRecieveFunc,
-					Args: []ast.Expr{chExpr, assignStmtLhs},
+					Fun: processRecieveFunc,
+					Args: []ast.Expr{
+						&ast.CallExpr{ // reflect.ValueOf(ch).Pointer()
+							Fun: &ast.SelectorExpr{ // reflect.ValueOf(ch).Pointer
+								X: &ast.CallExpr{ // reflect.ValueOf(ch)
+									Fun:  reflectValueOf,
+									Args: []ast.Expr{chExpr},
+								},
+								Sel: &ast.Ident{Name: "Pointer"},
+							},
+						},
+						assignStmtLhs,
+					},
 				},
 			},
-			&ast.ReturnStmt{
+			&ast.ReturnStmt{ //return value
 				Results: []ast.Expr{assignStmtLhs},
 			},
 		},
@@ -175,50 +177,53 @@ func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 
 	funcType := createRecieveFuncType(chType, true)
 
-	assignStmtLhsValue, err := parser.ParseExpr("value")
-	if err != nil {
-		panic("Can't parse lhs 'value' expression for an assignment stmt inside recieve function")
-	}
 	assignStmtLhsOk, err := parser.ParseExpr("ok")
 	if err != nil {
 		panic("Can't parse lhs 'ok' expression for an assignment stmt inside recieve function")
 	}
+
 	assignStmtRhs, err := parser.ParseExpr("<-ch")
 	if err != nil {
 		panic("Can't parse rhs expression for an assignment stmt inside recieve function")
 	}
+
 	processRecieveFunc, err := parser.ParseExpr("glimmer.ProcessRecieve")
 	if err != nil {
 		panic("Can't parse ProcessRecieveFunc")
 	}
-	chExpr, err := parser.ParseExpr("ch")
-	if err != nil {
-		panic("Can't parse 'ch' expression")
-	}
-	sleepFunc, err := parser.ParseExpr("glimmer.Sleep")
-	if err != nil {
-		panic("Can't parse glimmer.Sleep expression")
-	}
+
+	chExpr, assignStmtLhsValue, sleepFunc, reflectValueOf := getCommonExpressions()
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
-			&ast.ExprStmt{
+			&ast.ExprStmt{ // glimmer.Sleep()
 				X: &ast.CallExpr{
 					Fun: sleepFunc,
 				},
 			},
-			&ast.AssignStmt{
+			&ast.AssignStmt{ // value, ok := <-ch
 				Lhs: []ast.Expr{assignStmtLhsValue, assignStmtLhsOk},
 				Tok: token.DEFINE,
 				Rhs: []ast.Expr{assignStmtRhs},
 			},
-			&ast.ExprStmt{
+			&ast.ExprStmt{ // glimmer.ProcessRecieve(reflect.ValueOf(ch).Pointer(), value)
 				X: &ast.CallExpr{
-					Fun:  processRecieveFunc,
-					Args: []ast.Expr{chExpr, assignStmtLhsValue},
+					Fun: processRecieveFunc,
+					Args: []ast.Expr{
+						&ast.CallExpr{ // reflect.ValueOf(ch).Pointer()
+							Fun: &ast.SelectorExpr{ // reflect.ValueOf(ch).Pointer
+								X: &ast.CallExpr{ // reflect.ValueOf(ch)
+									Fun:  reflectValueOf,
+									Args: []ast.Expr{chExpr},
+								},
+								Sel: &ast.Ident{Name: "Pointer"},
+							},
+						},
+						assignStmtLhsValue,
+					},
 				},
 			},
-			&ast.ReturnStmt{
+			&ast.ReturnStmt{ // return value, ok
 				Results: []ast.Expr{assignStmtLhsValue, assignStmtLhsOk},
 			},
 		},
@@ -290,6 +295,7 @@ func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 	if chType == nil {
 		log.Fatal("Can't get the type of a channel in a send statement")
 	}
+
 	valueType := info.TypeOf(*value)
 	if valueType == nil {
 		log.Fatal("Can't get the type of a value in a send statement")
@@ -299,10 +305,12 @@ func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 	if err != nil {
 		panic("Can't parse channel type for the parameter of a send function")
 	}
+
 	valueParamType, err := parser.ParseExpr(fmt.Sprintf("%s", valueType))
 	if err != nil {
 		panic("Can't parse value type for the paramater of a send function")
 	}
+
 	params := &ast.FieldList{
 		List: []*ast.Field{
 			&ast.Field{
@@ -325,38 +333,39 @@ func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 		Results: results,
 	}
 
-	chanExpr, err := parser.ParseExpr("ch")
-	if err != nil {
-		panic("Can't parse chan expression")
-	}
-	valueExpr, err := parser.ParseExpr("value")
-	if err != nil {
-		panic("Can't parse value expression")
-	}
 	processSendFunc, err := parser.ParseExpr("glimmer.ProcessSend")
 	if err != nil {
 		panic("Can't parse glimmer.ProcessSend reference")
 	}
-	sleepFunc, err := parser.ParseExpr("glimmer.Sleep")
-	if err != nil {
-		panic("Can't parse glimmer.Sleep expression")
-	}
+
+	chExpr, valueExpr, sleepFunc, reflectValueOf := getCommonExpressions()
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
-			&ast.ExprStmt{
+			&ast.ExprStmt{ // glimmer.Sleep()
 				X: &ast.CallExpr{
 					Fun: sleepFunc,
 				},
 			},
-			&ast.SendStmt{
-				Chan:  chanExpr,
+			&ast.SendStmt{ // ch <- value
+				Chan:  chExpr,
 				Value: valueExpr,
 			},
-			&ast.ExprStmt{
+			&ast.ExprStmt{ // glimmer.ProcessRecieve(reflect.ValueOf(ch).Pointer(), value)
 				X: &ast.CallExpr{
-					Fun:  processSendFunc,
-					Args: []ast.Expr{chanExpr, valueExpr},
+					Fun: processSendFunc,
+					Args: []ast.Expr{
+						&ast.CallExpr{ // reflect.ValueOf(ch).Pointer()
+							Fun: &ast.SelectorExpr{ // reflect.ValueOf(ch).Pointer
+								X: &ast.CallExpr{ // reflect.ValueOf(ch)
+									Fun:  reflectValueOf,
+									Args: []ast.Expr{chExpr},
+								},
+								Sel: &ast.Ident{Name: "Pointer"},
+							},
+						},
+						valueExpr,
+					},
 				},
 			},
 		},
@@ -366,4 +375,28 @@ func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 		Type: funcType,
 		Body: body,
 	}
+}
+
+func getCommonExpressions() (ast.Expr, ast.Expr, ast.Expr, ast.Expr) {
+	chExpr, err := parser.ParseExpr("ch")
+	if err != nil {
+		panic("Can't parse chan expression")
+	}
+
+	valueExpr, err := parser.ParseExpr("value")
+	if err != nil {
+		panic("Can't parse value expression")
+	}
+
+	sleepFunc, err := parser.ParseExpr("glimmer.Sleep")
+	if err != nil {
+		panic("Can't parse glimmer.Sleep expression")
+	}
+
+	reflectValueOf, err := parser.ParseExpr("reflect.ValueOf")
+	if err != nil {
+		panic("Can't parse reflect.ValueOf expression")
+	}
+
+	return chExpr, valueExpr, sleepFunc, reflectValueOf
 }

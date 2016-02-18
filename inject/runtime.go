@@ -68,7 +68,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 // are being copied by value and the adresses are not correct
 // TODO value should not be send as pointer, right?
 
-func ProcessRecieve(ch, value interface{}) {
+func ProcessRecieve(ch uintptr, value interface{}) {
 	// get the caller of the caller of this function
 	// we get two levels below the current because
 	// this function is being called by the function literal
@@ -81,10 +81,10 @@ func ProcessRecieve(ch, value interface{}) {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("Recieve called from", caller.Name())
 
-	sendMessageEvent(caller.Name(), fmt.Sprintf("%d", &ch), fmt.Sprintf("%d", &value), true)
+	sendMessageEvent(caller.Name(), fmt.Sprintf("%d", ch), fmt.Sprintf("%d", value), true)
 }
 
-func ProcessSend(ch, value interface{}) {
+func ProcessSend(ch uintptr, value interface{}) {
 	// get the caller of the caller of this function
 	// we get two levels below the current because
 	// this function is being called by the function literal
@@ -97,7 +97,7 @@ func ProcessSend(ch, value interface{}) {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("Send called from", caller.Name())
 
-	sendMessageEvent(caller.Name(), fmt.Sprintf("%d", &ch), fmt.Sprintf("%d", &value), false)
+	sendMessageEvent(caller.Name(), fmt.Sprintf("%d", ch), fmt.Sprintf("%d", value), false)
 }
 
 func sendMessageEvent(funcName, ch, value string, eventType bool) {
