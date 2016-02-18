@@ -64,10 +64,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// TODO#: the ch and value args to process functions
-// are being copied by value and the adresses are not correct
-// TODO value should not be send as pointer, right?
-
 func ProcessRecieve(ch uintptr, value interface{}) {
 	// get the caller of the caller of this function
 	// we get two levels below the current because

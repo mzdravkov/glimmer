@@ -72,8 +72,23 @@ func (r *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rew
 			fmt.Println(info.TypeOf(n.X))
 			return AddRecvExpr(n), nil
 		}
-		//TODO: make a special case for result, ok := <-ch
+	case *ast.AssignStmt: // case for value, ok := <-ch
+		if len(n.Lhs) != 2 {
+			return node, nil
+		}
+
+		if len(n.Rhs) != 1 {
+			return node, nil
+		}
+
+		switch n.Rhs[0].(type) {
+		case *ast.UnaryExpr:
+			return AddRecvWithBoolAssignStmt(n), nil
+		default:
+			return node, nil
+		}
 	}
+
 	return node, r
 }
 
@@ -94,6 +109,21 @@ func AddRecvExpr(recvExpr *ast.UnaryExpr) *ast.CallExpr {
 	return &ast.CallExpr{
 		Fun:  createRecieveFunc(&recvExpr.X),
 		Args: []ast.Expr{recvExpr.X},
+	}
+}
+
+// This returns the glimmer substitute of a recieve with bool assignment statement
+func AddRecvWithBoolAssignStmt(recvAssignStmt *ast.AssignStmt) *ast.AssignStmt {
+	unaryChanExpr := recvAssignStmt.Rhs[0].(*ast.UnaryExpr)
+	return &ast.AssignStmt{
+		Lhs: recvAssignStmt.Lhs,
+		Tok: token.DEFINE,
+		Rhs: []ast.Expr{
+			&ast.CallExpr{
+				Fun:  createRecieveWithBoolFunc(&unaryChanExpr.X),
+				Args: []ast.Expr{unaryChanExpr.X},
+			},
+		},
 	}
 }
 
