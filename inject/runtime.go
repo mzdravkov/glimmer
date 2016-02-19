@@ -2,6 +2,7 @@ package glimmer
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"runtime"
@@ -39,6 +40,8 @@ var (
 
 	delay     int = 1000
 	delayLock sync.RWMutex
+
+	sendFunctionsOnce sync.Once
 )
 
 func Locks(ch uintptr) *chanLock {
@@ -61,21 +64,27 @@ func init() {
 
 	go func() {
 		http.HandleFunc("/", handler)
-		err := http.ListenAndServe(":"+port, nil)
-		if err != nil {
-			panic(err)
-		}
+		log.Fatal(http.ListenAndServe(":"+port, nil))
 	}()
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	upgrader := websocket.Upgrader{}
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 	defer conn.Close()
+
+	sendFunctionsOnce.Do(func() {
+		err := conn.WriteMessage(websocket.TextMessage, readAnnotatedFunctionsFile())
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
 
 	for {
 		select {
@@ -84,8 +93,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		case m := <-forSendingQueue:
 			if err := conn.WriteJSON(m); err != nil {
 				log.Fatal(err)
-				// TODO-min: should I exit here?
-				return
 			}
 		}
 	}
@@ -146,4 +153,13 @@ func Sleep() {
 	delayLock.RUnlock()
 
 	time.Sleep(time.Duration(amount) * time.Millisecond)
+}
+
+func readAnnotatedFunctionsFile() []byte {
+	data, err := ioutil.ReadFile("glimmer_functions.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return data
 }

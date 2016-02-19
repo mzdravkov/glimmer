@@ -46,7 +46,21 @@ function addRow(name) {
 }
 
 $( document ).ready(function() {
-  $.getJSON("glimmer_functions.json", function(data) {
-    alert(data);
-  });
+  var connection = new WebSocket('ws://127.0.0.1:9610/');
+
+  connection.onopen = function() {
+    connection.onmessage = function(e) {
+      var server_message = JSON.parse(e.data);
+      console.log(server_message);
+
+      // if the message is the functions initialization message
+      if ('Functions' in server_message) {
+        for (i in server_message.Functions) {
+          addColumn(server_message.Functions[i]);
+        }
+
+        return
+      }
+    }
+  }
 });
