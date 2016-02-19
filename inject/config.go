@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	config goconfig.ConfigFile
+	config *goconfig.ConfigFile
 
 	port string
 )
@@ -19,7 +19,7 @@ func init() {
 		panic(err)
 	}
 
-	if port, err = config.GetInt64("default", "port"); err != nil {
+	if port, err = config.GetString("default", "port"); err != nil {
 		panic(err)
 	}
 }

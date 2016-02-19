@@ -4,6 +4,8 @@ import (
 	"github.com/tucnak/climax"
 )
 
+var flags = make(map[string]string)
+
 func createProgram() *climax.Application {
 	program := climax.New("glimmer")
 
@@ -23,6 +25,11 @@ func createProgram() *climax.Application {
 				Usage:    "--port=4242",
 				Variable: true,
 			},
+			{
+				Name:     "examine-all",
+				Short:    "a",
+				Variable: false,
+			},
 		},
 
 		Examples: []climax.Example{
@@ -36,7 +43,23 @@ func createProgram() *climax.Application {
 				return 1
 			}
 
-			run(ctx.Args[0])
+			if value, ok := ctx.Get("port"); ok {
+				flags["port"] = value
+			} else {
+				flags["port"] = "9610"
+			}
+
+			if value, ok := ctx.Get("delay"); ok {
+				flags["delay"] = value
+			} else {
+				flags["delay"] = "1000"
+			}
+
+			if _, ok := ctx.Get("examine-all"); ok {
+				flags["examine-all"] = "true"
+			}
+
+			run(ctx.Args[0], flags)
 			return 0
 		},
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/importer"
 	"go/parser"
@@ -38,7 +39,7 @@ var info types.Info = types.Info{
 	Uses:  make(map[*ast.Ident]types.Object),
 }
 
-func run(path string) {
+func run(path string, flags map[string]string) {
 	fset := token.NewFileSet()
 
 	packages, err := parser.ParseDir(fset, path, nil, parser.ParseComments)
@@ -84,6 +85,7 @@ func run(path string) {
 	}
 
 	createAnotatedFunctionsFile(glimmerTmpFolderPath)
+	createConfigFile(glimmerTmpFolderPath, flags)
 
 	// run goimports on glimmerTmpFolder to remove the glimmer runtime import from files where it is not used
 	if err := exec.Command("goimports", "-w", glimmerTmpFolderPath).Run(); err != nil {
@@ -114,6 +116,13 @@ func createAnotatedFunctionsFile(dir string) {
 	ioutil.WriteFile(filepath.Join(dir, "glimmer_functions.json"), data, os.ModePerm)
 }
 
-func writeConfigFile(dir string) {
+func createConfigFile(dir string, flags map[string]string) {
+	format := `
+[default]
+port=%s
+delay=%s
+`
+	data := fmt.Sprintf(format, flags["port"], flags["delay"])
 
+	ioutil.WriteFile(filepath.Join(dir, "glimmer_config.cfg"), []byte(data), os.ModePerm)
 }

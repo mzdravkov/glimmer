@@ -24,22 +24,24 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 	case *ast.File:
 		return f
 	case *ast.FuncDecl: // if it is a function declaration
-		// prune search if function has no attached comments
-		if n.Doc == nil {
-			return nil
-		}
-
-		// prune search if there is no line in the comment group that is a glimmer annotation
-		isAnnotated := false
-		for _, v := range n.Doc.List {
-			if v.Text == "// glimmer" || v.Text == "//glimmer" {
-				isAnnotated = true
-				break
+		if _, ok := flags["examine-all"]; !ok {
+			// prune search if function has no attached comments
+			if n.Doc == nil {
+				return nil
 			}
-		}
 
-		if !isAnnotated {
-			return nil
+			// prune search if there is no line in the comment group that is a glimmer annotation
+			isAnnotated := false
+			for _, v := range n.Doc.List {
+				if v.Text == "// glimmer" || v.Text == "//glimmer" {
+					isAnnotated = true
+					break
+				}
+			}
+
+			if !isAnnotated {
+				return nil
+			}
 		}
 
 		annotatedFunctions = append(annotatedFunctions, n.Name.Name)

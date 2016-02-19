@@ -41,11 +41,13 @@ func init() {
 	// forSendingQueue = make(chan *MessageEvent, 1024)
 	forSendingQueue = make(chan *MessageEvent)
 
-	http.HandleFunc("/", handler)
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		panic(err)
-	}
+	go func() {
+		http.HandleFunc("/", handler)
+		err := http.ListenAndServe(":"+port, nil)
+		if err != nil {
+			panic(err)
+		}
+	}()
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +86,7 @@ func ProcessRecieve(ch uintptr, value interface{}) {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("Recieve called from", caller.Name())
 
-	sendMessageEvent(caller.Name(), fmt.Sprintf("%d", ch), fmt.Sprintf("%d", value), true)
+	go sendMessageEvent(caller.Name(), fmt.Sprintf("%d", ch), fmt.Sprintf("%d", value), true)
 }
 
 func ProcessSend(ch uintptr, value interface{}) {
@@ -100,7 +102,7 @@ func ProcessSend(ch uintptr, value interface{}) {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("Send called from", caller.Name())
 
-	sendMessageEvent(caller.Name(), fmt.Sprintf("%d", ch), fmt.Sprintf("%d", value), false)
+	go sendMessageEvent(caller.Name(), fmt.Sprintf("%d", ch), fmt.Sprintf("%d", value), false)
 }
 
 func sendMessageEvent(funcName, ch, value string, eventType bool) {
