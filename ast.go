@@ -157,10 +157,21 @@ func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
 		panic("Can't parse callProcessRecieveFunc")
 	}
 
-	chExpr, assignStmtLhs, sleepFunc, reflectValueOf := getCommonExpressions()
+	chExpr, assignStmtLhs, sleepFunc, reflectValueOf, locksExpr := getCommonExpressions()
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
+			&ast.ExprStmt{ // glimmer.Locks[ch].Recieve.Lock()
+				X: &ast.CallExpr{
+					Fun: &ast.SelectorExpr{ // glimmer.Locks[ch].Recieve.Lock
+						X: &ast.SelectorExpr{ // glimmer.Locks[ch].Recieve
+							X:   locksExpr,
+							Sel: &ast.Ident{Name: "Recieve"},
+						},
+						Sel: &ast.Ident{Name: "Lock"},
+					},
+				},
+			},
 			&ast.ExprStmt{ // glimmer.Sleep()
 				X: &ast.CallExpr{
 					Fun: sleepFunc,
@@ -224,10 +235,21 @@ func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 		panic("Can't parse ProcessRecieveFunc")
 	}
 
-	chExpr, assignStmtLhsValue, sleepFunc, reflectValueOf := getCommonExpressions()
+	chExpr, assignStmtLhsValue, sleepFunc, reflectValueOf, locksExpr := getCommonExpressions()
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
+			&ast.ExprStmt{ // glimmer.Locks[ch].Recieve.Lock()
+				X: &ast.CallExpr{
+					Fun: &ast.SelectorExpr{ // glimmer.Locks[ch].Recieve.Lock
+						X: &ast.SelectorExpr{ // glimmer.Locks[ch].Recieve
+							X:   locksExpr,
+							Sel: &ast.Ident{Name: "Recieve"},
+						},
+						Sel: &ast.Ident{Name: "Lock"},
+					},
+				},
+			},
 			&ast.ExprStmt{ // glimmer.Sleep()
 				X: &ast.CallExpr{
 					Fun: sleepFunc,
@@ -370,10 +392,21 @@ func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 		panic("Can't parse glimmer.ProcessSend reference")
 	}
 
-	chExpr, valueExpr, sleepFunc, reflectValueOf := getCommonExpressions()
+	chExpr, valueExpr, sleepFunc, reflectValueOf, locksExpr := getCommonExpressions()
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
+			&ast.ExprStmt{ // glimmer.Locks[ch].Send.Lock()
+				X: &ast.CallExpr{
+					Fun: &ast.SelectorExpr{ // glimmer.Locks[ch].Send.Lock
+						X: &ast.SelectorExpr{ // glimmer.Locks[ch].Send
+							X:   locksExpr,
+							Sel: &ast.Ident{Name: "Send"},
+						},
+						Sel: &ast.Ident{Name: "Lock"},
+					},
+				},
+			},
 			&ast.ExprStmt{ // glimmer.Sleep()
 				X: &ast.CallExpr{
 					Fun: sleepFunc,
@@ -409,7 +442,7 @@ func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 	}
 }
 
-func getCommonExpressions() (ast.Expr, ast.Expr, ast.Expr, ast.Expr) {
+func getCommonExpressions() (ast.Expr, ast.Expr, ast.Expr, ast.Expr, ast.Expr) {
 	chExpr, err := parser.ParseExpr("ch")
 	if err != nil {
 		panic("Can't parse chan expression")
@@ -430,5 +463,10 @@ func getCommonExpressions() (ast.Expr, ast.Expr, ast.Expr, ast.Expr) {
 		panic("Can't parse reflect.ValueOf expression")
 	}
 
-	return chExpr, valueExpr, sleepFunc, reflectValueOf
+	locksExpr, err := parser.ParseExpr("glimmer.Locks(reflect.ValueOf(ch).Pointer())")
+	if err != nil {
+		panic("Can't parse glimmer.Locks expression")
+	}
+
+	return chExpr, valueExpr, sleepFunc, reflectValueOf, locksExpr
 }

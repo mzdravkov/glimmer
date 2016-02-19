@@ -27,19 +27,37 @@ type MessageEvent struct {
 	Value string
 }
 
+type chanLock struct {
+	Send    *sync.Mutex
+	Recieve *sync.Mutex
+}
+
 var (
+	locks = make(map[uintptr]*chanLock)
+
 	forSendingQueue chan *MessageEvent
 
 	delay     int = 1000
 	delayLock sync.RWMutex
 )
 
+func Locks(ch uintptr) *chanLock {
+	if chLock, ok := locks[ch]; ok {
+		return chLock
+	}
+
+	locks[ch] = &chanLock{
+		Send:    new(sync.Mutex),
+		Recieve: new(sync.Mutex),
+	}
+	return locks[ch]
+}
+
 func init() {
 	// 1024 seems a reasonable buffer size for this
 	// TODO-min: consider using the channels with infinite buffers
 	// from https://github.com/eapache/channels
-	// forSendingQueue = make(chan *MessageEvent, 1024)
-	forSendingQueue = make(chan *MessageEvent)
+	forSendingQueue = make(chan *MessageEvent, 1024)
 
 	go func() {
 		http.HandleFunc("/", handler)
@@ -86,7 +104,7 @@ func ProcessRecieve(ch uintptr, value interface{}) {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("Recieve called from", caller.Name())
 
-	go sendMessageEvent(caller.Name(), fmt.Sprintf("%d", ch), fmt.Sprintf("%d", value), true)
+	go sendMessageEvent(ch, caller.Name(), fmt.Sprintf("%d", value), true)
 }
 
 func ProcessSend(ch uintptr, value interface{}) {
@@ -102,18 +120,24 @@ func ProcessSend(ch uintptr, value interface{}) {
 	caller := runtime.FuncForPC(programCounter)
 	fmt.Println("Send called from", caller.Name())
 
-	go sendMessageEvent(caller.Name(), fmt.Sprintf("%d", ch), fmt.Sprintf("%d", value), false)
+	go sendMessageEvent(ch, caller.Name(), fmt.Sprintf("%d", value), false)
 }
 
-func sendMessageEvent(funcName, ch, value string, eventType bool) {
+func sendMessageEvent(ch uintptr, funcName, value string, eventType bool) {
 	messageEvent := &MessageEvent{
 		Func:  funcName,
 		Type:  eventType,
-		Chan:  ch,
+		Chan:  fmt.Sprintf("%d", ch),
 		Value: value,
 	}
 
 	forSendingQueue <- messageEvent
+
+	if eventType {
+		Locks(ch).Recieve.Unlock()
+	} else {
+		Locks(ch).Send.Unlock()
+	}
 }
 
 func Sleep() {
