@@ -14,8 +14,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-
-	"github.com/tucnak/climax"
 )
 
 // TODO: would glimmer work on a clean installation?
@@ -23,29 +21,7 @@ import (
 // For example goimports?
 
 func main() {
-	program := climax.New("glimmer")
-
-	program.Brief = "Glimmer is a tool that visualises the communication between goroutines"
-	program.Version = "0.0.1"
-
-	on := climax.Command{
-		Name:  "on",
-		Brief: "set the path to the project, onto which you want to run glimmer",
-		Usage: `glimmer on /path/to/some/project`,
-		Help:  `set the path to the project, onto which you want to run glimmer`,
-
-		Flags: []climax.Flag{},
-
-		Examples: []climax.Example{},
-
-		Handle: func(ctx climax.Context) int {
-			run(ctx.Args[0])
-			return 0
-		},
-	}
-
-	program.AddCommand(on)
-	program.Run()
+	createProgram().Run()
 }
 
 // glimmer
@@ -136,4 +112,8 @@ func createAnotatedFunctionsFile(dir string) {
 	}
 
 	ioutil.WriteFile(filepath.Join(dir, "glimmer_functions.json"), data, os.ModePerm)
+}
+
+func writeConfigFile(dir string) {
+
 }

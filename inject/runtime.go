@@ -12,13 +12,13 @@ import (
 )
 
 // for debugging
-func init() {
-	go func() {
-		for {
-			fmt.Println(<-forSendingQueue)
-		}
-	}()
-}
+// func init() {
+// 	go func() {
+// 		for {
+// 			fmt.Println(<-forSendingQueue)
+// 		}
+// 	}()
+// }
 
 type MessageEvent struct {
 	Func  string
@@ -38,7 +38,14 @@ func init() {
 	// 1024 seems a reasonable buffer size for this
 	// TODO-min: consider using the channels with infinite buffers
 	// from https://github.com/eapache/channels
-	forSendingQueue = make(chan *MessageEvent, 1024)
+	// forSendingQueue = make(chan *MessageEvent, 1024)
+	forSendingQueue = make(chan *MessageEvent)
+
+	http.HandleFunc("/", handler)
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
