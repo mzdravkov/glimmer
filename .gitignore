@@ -22,3 +22,10 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+# Vim swap and undo files
+*.swp
+*.un~
+
+# The project binary
+glimmer
