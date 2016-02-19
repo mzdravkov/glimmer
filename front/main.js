@@ -21,8 +21,8 @@ function addRow(name) {
   var headerRow = $("#main-table tr:first")[0].children;
   var columns = headerRow.length
 
-  for (var i = 1; i < columns - 1; i++) {
-    for (var k = i + 1; k < columns; k++) {
+  for (var i = 1; i < columns; i++) {
+    for (var k = i; k < columns; k++) {
       var ithFn = headerRow[i].id;
       var kthFn = headerRow[k].id;
       var trId = name + "#" + ithFn + "#" + kthFn;
@@ -45,21 +45,94 @@ function addRow(name) {
   }
 }
 
+function processRecive(recieveMessage) {
+  console.log("proc", recieveMessage);
+}
+
+function processSend(sendMessage) {
+  console.log("proc", sendMessage);
+}
+
+function processMessagePassing(sendMessage, recieveMessage) {
+  console.log(sendMessage + " -> " + recieveMessage);
+}
+
+var events = {};
+var channels = {};
+
 $( document ).ready(function() {
   var connection = new WebSocket('ws://127.0.0.1:9610/');
 
   connection.onopen = function() {
     connection.onmessage = function(e) {
-      var server_message = JSON.parse(e.data);
-      console.log(server_message);
+      var serverMessage = JSON.parse(e.data);
+      console.log(serverMessage);
 
       // if the message is the functions initialization message
-      if ('Functions' in server_message) {
-        for (i in server_message.Functions) {
-          addColumn(server_message.Functions[i]);
+      if ('Functions' in serverMessage) {
+        for (i in serverMessage.Functions) {
+          addColumn(serverMessage.Functions[i]);
         }
 
-        return
+        return;
+      }
+
+      // if it is a normal event message
+
+      if (!(serverMessage.Chan in channels)) {
+        channels[serverMessage.Chan] = true;
+        addRow(serverMessage.Chan);
+      }
+
+      // if it is a read event
+      if (serverMessage.Type == true) {
+        // the key for a corresponding send event
+        var key = serverMessage.Chan + '.' + serverMessage.Value + ".false";
+        if (key in events) {
+          var correspondingSend = events[key].shift();
+
+          if (events[key].length == 0) {
+            delete events[key];
+          }
+
+          processMessagePassing(correspondingSend, serverMessage);
+        } else {
+          var recieveEventKey = serverMessage.Chan + '.' + serverMessage.Value + ".true";
+
+          if (recieveEventKey in events) {
+            events[recieveEventKey].push(serverMessage);
+
+            processRecive(serverMessage);
+          } else {
+            events[recieveEventKey] = [serverMessage];
+
+            processRecive(serverMessage);
+          }
+        }
+      } else { // if it is a write event
+        // the key for a corresponding recieve event
+        var key = serverMessage.Chan + '.' + serverMessage.Value + ".true";
+        if (key in events) {
+          var correspondingRecieve = events[key].shift();
+
+          if (events[key].length == 0) {
+            delete events[key];
+          }
+
+          processMessagePassing(serverMessage, correspondingRecieve);
+        } else {
+          var sendEventKey = serverMessage.Chan + '.' + serverMessage.Value + ".true";
+
+          if (sendEventKey in events) {
+            events[sendEventKey].push(serverMessage);
+
+            processSend(serverMessage);
+          } else {
+            events[sendEventKey] = [serverMessage];
+
+            processSend(serverMessage);
+          }
+        }
       }
     }
   }

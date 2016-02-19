@@ -15,7 +15,9 @@ import (
 
 var annotatedFunctions []string = make([]string, 0)
 
-type FuncDeclFinder struct{}
+type FuncDeclFinder struct {
+	Package string
+}
 
 // Visit implements the ast.Visitor interface.
 // it searches for function declarations with a glimmer annotation
@@ -44,7 +46,7 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 			}
 		}
 
-		annotatedFunctions = append(annotatedFunctions, n.Name.Name)
+		annotatedFunctions = append(annotatedFunctions, f.Package+"."+n.Name.Name)
 
 		chanOperationsRewriter := new(ChanOperationsRewriter)
 		gorewrite.Rewrite(chanOperationsRewriter, n.Body)

@@ -68,11 +68,11 @@ func run(path string, flags map[string]string) {
 		}
 	}
 
-	funcDeclFinder := new(FuncDeclFinder)
-	for _, pkg := range packages {
+	for pkgName, pkg := range packages {
 		for fileName, file := range pkg.Files {
 			AddGlimmerImports(fset, packages)
 
+			funcDeclFinder := &FuncDeclFinder{Package: pkgName}
 			ast.Walk(funcDeclFinder, file)
 
 			// export the ast to a file in glimmer_tmp directory
