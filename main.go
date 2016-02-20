@@ -19,26 +19,20 @@ import (
 
 // TODO: would glimmer work on a clean installation?
 // Are there any dependencies that are not packaged with it?
-// For example goimports?
+// For example goimports? Any other?
 
 func main() {
 	createProgram().Run()
 }
 
-// glimmer
-func testFunc() {
-	ch := make(chan int, 2)
-	ch <- 1
-	<-ch
-	println(len(ch))
-}
-
+// info is for storing type information that we get from runnig the type checker
 var info types.Info = types.Info{
 	Types: make(map[ast.Expr]types.TypeAndValue),
 	Defs:  make(map[*ast.Ident]types.Object),
 	Uses:  make(map[*ast.Ident]types.Object),
 }
 
+// run is the main function for the creation of the modified copy of the user project
 func run(path string, flags map[string]string) {
 	fset := token.NewFileSet()
 
@@ -70,9 +64,9 @@ func run(path string, flags map[string]string) {
 
 	for pkgName, pkg := range packages {
 		for fileName, file := range pkg.Files {
-			AddGlimmerImports(fset, packages)
+			addGlimmerImports(fset, packages)
 
-			funcDeclFinder := &FuncDeclFinder{Package: pkgName}
+			funcDeclFinder := &funcDeclFinder{Package: pkgName}
 			ast.Walk(funcDeclFinder, file)
 
 			// export the ast to a file in glimmer_tmp directory
@@ -103,6 +97,8 @@ func run(path string, flags map[string]string) {
 	}
 }
 
+// createAnotatedFunctionsFile creates a file containing a JSON with list
+// of all annotated functions and saves it to the directory at the provided path
 func createAnotatedFunctionsFile(dir string) {
 	s := struct {
 		Functions []string
@@ -116,6 +112,8 @@ func createAnotatedFunctionsFile(dir string) {
 	ioutil.WriteFile(filepath.Join(dir, "glimmer_functions.json"), data, os.ModePerm)
 }
 
+// createConfigFile makes a file with configurations for the runtime.
+// It serves to give the passed flags to the runtime
 func createConfigFile(dir string, flags map[string]string) {
 	format := `
 [default]

@@ -13,15 +13,16 @@ import (
 	"github.com/tsuna/gorewrite"
 )
 
+// list of all annotated functions
 var annotatedFunctions []string = make([]string, 0)
 
-type FuncDeclFinder struct {
+type funcDeclFinder struct {
 	Package string
 }
 
 // Visit implements the ast.Visitor interface.
 // it searches for function declarations with a glimmer annotation
-func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
+func (f *funcDeclFinder) Visit(node ast.Node) ast.Visitor {
 	switch n := node.(type) {
 	case *ast.File:
 		return f
@@ -48,7 +49,7 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 
 		annotatedFunctions = append(annotatedFunctions, f.Package+"."+n.Name.Name)
 
-		chanOperationsRewriter := new(ChanOperationsRewriter)
+		chanOperationsRewriter := new(chanOperationsRewriter)
 		gorewrite.Rewrite(chanOperationsRewriter, n.Body)
 
 		return nil // Prune search
@@ -57,24 +58,20 @@ func (f *FuncDeclFinder) Visit(node ast.Node) ast.Visitor {
 	return nil // Prune search
 }
 
-type ChanOperationsRewriter struct{}
+type chanOperationsRewriter struct{}
 
 // Rewrite implements the gorewrite.Rewriter interface.
 // it should be called for a function body node and it
 // searches for send and recieve statement and rewrites them
 // to log the event of communication
-func (r *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
+func (r *chanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
 	switch n := node.(type) {
 	case *ast.SendStmt:
-		fmt.Println("send to channel: ", n)
-		fmt.Println(info.TypeOf(n.Chan))
-		return AddSendStmt(n), nil
+		return addSendStmt(n), nil
 	case *ast.UnaryExpr:
 		// if we have a reading from channel
 		if n.Op == token.ARROW {
-			fmt.Println("receive from channel: ", n)
-			fmt.Println(info.TypeOf(n.X))
-			return AddRecvExpr(n), nil
+			return addRecvExpr(n), nil
 		}
 	case *ast.AssignStmt: // case for value, ok := <-ch
 		if len(n.Lhs) != 2 {
@@ -87,7 +84,7 @@ func (r *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rew
 
 		switch n.Rhs[0].(type) {
 		case *ast.UnaryExpr:
-			return AddRecvWithBoolAssignStmt(n), nil
+			return addRecvWithBoolAssignStmt(n), nil
 		default:
 			return node, nil
 		}
@@ -96,8 +93,8 @@ func (r *ChanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rew
 	return node, r
 }
 
-// This returns the glimmer substitute of a send statement
-func AddSendStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
+// AddSendStmt returns the glimmer substitute of a send statement
+func addSendStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
 	callSendExpression := &ast.CallExpr{
 		Fun:  createSendFunc(&sendStmt.Chan, &sendStmt.Value),
 		Args: []ast.Expr{sendStmt.Chan, sendStmt.Value},
@@ -108,16 +105,16 @@ func AddSendStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
 	}
 }
 
-// This returns the glimmer substitute of a recieve expression
-func AddRecvExpr(recvExpr *ast.UnaryExpr) *ast.CallExpr {
+// AddRecvExpr returns the glimmer substitute of a recieve expression
+func addRecvExpr(recvExpr *ast.UnaryExpr) *ast.CallExpr {
 	return &ast.CallExpr{
 		Fun:  createRecieveFunc(&recvExpr.X),
 		Args: []ast.Expr{recvExpr.X},
 	}
 }
 
-// This returns the glimmer substitute of a recieve with bool assignment statement
-func AddRecvWithBoolAssignStmt(recvAssignStmt *ast.AssignStmt) *ast.AssignStmt {
+// AddRecvWithBoolAssignStmt returns the glimmer substitute of a recieve with bool assignment statement
+func addRecvWithBoolAssignStmt(recvAssignStmt *ast.AssignStmt) *ast.AssignStmt {
 	unaryChanExpr := recvAssignStmt.Rhs[0].(*ast.UnaryExpr)
 	return &ast.AssignStmt{
 		Lhs: recvAssignStmt.Lhs,
@@ -131,8 +128,8 @@ func AddRecvWithBoolAssignStmt(recvAssignStmt *ast.AssignStmt) *ast.AssignStmt {
 	}
 }
 
-// Adds the glimmer runtime import to each file in the provided packages
-func AddGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
+// AddGlimmerImports adds the glimmer runtime import to each file in the provided packages
+func addGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
 	for _, pkg := range packages {
 		for _, file := range pkg.Files {
 			astutil.AddNamedImport(fset, file, "glimmer", "github.com/mzdravkov/glimmer/inject")
@@ -140,7 +137,7 @@ func AddGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
 	}
 }
 
-// Creates a function that serves as a substitute for a recieve expression
+// createRecieveFunc creates a function that serves as a substitute for a recieve expression
 func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
 	chType := info.TypeOf(*ch)
 	if chType == nil {
@@ -213,7 +210,7 @@ func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
 	}
 }
 
-// Creates a function that serves as a substitute for a recieve with bool expression
+// createRecieveWithBoolFunc creates a function that serves as a substitute for a recieve with bool expression
 func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 	chType := info.TypeOf(*ch)
 	if chType == nil {
@@ -291,7 +288,7 @@ func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 	}
 }
 
-// Creates an ast.FuncType with one argument, which is a channel type and
+// createRecieveFuncType creates an ast.FuncType with one argument, which is a channel type and
 // the return results are the element type of the channel and (if withBool is true)
 // a boolean value
 func createRecieveFuncType(chType types.Type, withBool bool) *ast.FuncType {
@@ -345,7 +342,7 @@ func createRecieveFuncType(chType types.Type, withBool bool) *ast.FuncType {
 	}
 }
 
-// Creates a function that serves as a substitute for a send statement
+// createSendFunc creates a function that serves as a substitute for a send statement
 func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 	chType := info.TypeOf(*ch)
 	if chType == nil {

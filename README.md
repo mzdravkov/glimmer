@@ -4,6 +4,7 @@ A Go tool that visualizes the communication between goroutines
 Glimmer works by modifying the AST ([Abstract Syntax Tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree)) of the program that you provide it with. It then compiles this modified copy of your program (it won't change the actual code, don't worry) and runs it. The modifications that Glimmer did in the first step will send all the messages that are being send by channels, that are in a tracked functions, to a front-end that will display this messages nicely.
 
 # Installation
+```go get golang.org/x/tools/cmd/goimports```
 
 ```go get github.com/mzdravkov/glimmer```
 
@@ -11,8 +12,6 @@ Glimmer works by modifying the AST ([Abstract Syntax Tree](https://en.wikipedia.
 Glimmer is pretty simple and straight forward. All you need to do is to annotate the functions that you want to examine with this special comment:
 
 ```// glimmer```
-
-Note: it should be written exactly as it appears here, this means that if you add an extra space (or no space at all) between the comment token and the word ```glimmer``` it won't work.
 
 Once you've finished annotating, you just run the glimmer command-line tool and provide it with the path to the program:
 
@@ -34,7 +33,7 @@ When Glimmer runs it starts a web server listening on port 9610. Just open ```lo
 
 
 # State
-Still, ```Glimmer``` is in a very early state - totally not ready for work
+```Glimmer``` is in a very early state and it's still quite nonfunctional
 
 # License
 Apache License Version 2.0, January 2004
