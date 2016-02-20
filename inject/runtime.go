@@ -38,7 +38,7 @@ var (
 
 	forSendingQueue chan *MessageEvent
 
-	delay     int = 1000
+	delay     int = 2000
 	delayLock sync.RWMutex
 
 	sendFunctionsOnce sync.Once

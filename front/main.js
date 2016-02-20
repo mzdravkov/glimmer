@@ -1,21 +1,24 @@
 // TODO: add columns so that they are alphabetically sorted
 function addColumn(name) {
   // append new column header
-  $("#main-table tr:first").append("<td id='fn@" + name + "'>" + name + "</td>");
+  $("#main-table tr:first").append("<td id='fn_" + name + "'>" + name + "</td>");
 
   var rows = $("#main-table tr");
   for (var i = 1; i < $("#main-table tr").length - 1; i++) {
     var rowId = rows[i].id;
-    var [chan, fn1, fn2] = rowId.split("#");
+    var [chan, fn1, fn2] = rowId.split("/");
     if (name == fn1 || name == fn2) {
       // add the name at the end to know under each function is this cell id
-      var tdId = chan + "#" + fn1 + "#" + fn2 + "#" + name;
+      var tdId = chan + "_" + fn1 + "_" + fn2 + "_" + name;
       $("#main-table tr:eq(" + i + ")").append("<td id='" + tdId + "'>o</td>");
     } else {
       $("#main-table tr:eq(" + i + ")").append("<td></td>");
     }
   }
 }
+
+// NOTE: cells have id of the following pattern:
+// <chan>_fn_<ithFn>_fn_<kthFn>_fn_<columnFn>
 
 function addRow(name) {
   var headerRow = $("#main-table tr:first")[0].children;
@@ -25,17 +28,17 @@ function addRow(name) {
     for (var k = i; k < columns; k++) {
       var ithFn = headerRow[i].id;
       var kthFn = headerRow[k].id;
-      var trId = name + "#" + ithFn + "#" + kthFn;
+      var trId = name + "_" + ithFn + "_" + kthFn;
 
       $("#main-table tbody").append("<tr id='" + trId + "'></tr>");
 
       var newRow = $("#main-table tbody tr:last");
 
-      newRow.append("<td>" + name + "</td>");
+      newRow.append("<td class='chan-name'>" + name + "</td>");
 
       for (var l = 1; l < headerRow.length; l++) {
         if (headerRow[l].id == ithFn || headerRow[l].id == kthFn) {
-          var tdId = trId + "#" + headerRow[l].id;
+          var tdId = trId + "_" + headerRow[l].id;
           newRow.append("<td id='" + tdId + "'>o</td>");
         } else {
           newRow.append("<td></td>");
@@ -43,18 +46,56 @@ function addRow(name) {
       }
     }
   }
+
+  $(".chan-name").outerWidth(100);
+}
+
+function idFromSingleMessage(message) {
+  return message.Chan + ("_fn_" + message.Func).repeat(3);
 }
 
 function processRecive(recieveMessage) {
-  console.log("proc", recieveMessage);
+  var id = idFromSingleMessage(recieveMessage);
+
+  document.getElementById(id).innerHTML = "<-o";
 }
 
 function processSend(sendMessage) {
-  console.log("proc", sendMessage);
+  var id = idFromSingleMessage(sendMessage);
+
+  document.getElementById(id).innerHTML = "o<-";
 }
 
 function processMessagePassing(sendMessage, recieveMessage) {
   console.log(sendMessage + " -> " + recieveMessage);
+  var chan = sendMessage.Chan;
+  var sendFn = sendMessage.Func;
+  var recvFn = recieveMessage.Func;
+
+  var leftColumn, rightColumn;
+  var testId = chan + "_fn_" + sendFn + "_fn_" + recvFn + "_fn_" + sendFn;
+  if (document.getElementById(testId) != null) {
+    leftColumn = sendFn;
+    rightColumn = recvFn;
+  } else {
+    leftColumn = recvFn;
+    rightColumn = sendFn;
+  }
+
+  var common = chan + "_fn_" + leftColumn + "_fn_" + rightColumn + "_fn_";
+  var leftId = common + leftColumn;
+  var rightId = common + rightColumn;
+  if (leftColumn == sendMessage.Func) {
+    console.log(leftId);
+    console.log(rightId);
+    document.getElementById(leftId).innerHTML = "o----->";
+    document.getElementById(rightId).innerHTML = "----->o";
+  } else {
+    console.log(leftId);
+    console.log(rightId);
+    document.getElementById(leftId).innerHTML = "o<-----";
+    document.getElementById(rightId).innerHTML = "<-----o";
+  }
 }
 
 var events = {};
@@ -91,6 +132,8 @@ $( document ).ready(function() {
         if (key in events) {
           var correspondingSend = events[key].shift();
 
+          document.getElementById(idFromSingleMessage(correspondingSend)).innerHTML = "o";
+
           if (events[key].length == 0) {
             delete events[key];
           }
@@ -114,6 +157,8 @@ $( document ).ready(function() {
         var key = serverMessage.Chan + '.' + serverMessage.Value + ".true";
         if (key in events) {
           var correspondingRecieve = events[key].shift();
+
+          document.getElementById(idFromSingleMessage(correspondingRecieve)).innerHTML = "o";
 
           if (events[key].length == 0) {
             delete events[key];
