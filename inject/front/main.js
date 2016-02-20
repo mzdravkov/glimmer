@@ -67,7 +67,6 @@ function processSend(sendMessage) {
 }
 
 function processMessagePassing(sendMessage, recieveMessage) {
-  console.log(sendMessage + " -> " + recieveMessage);
   var chan = sendMessage.Chan;
   var sendFn = sendMessage.Func;
   var recvFn = recieveMessage.Func;
@@ -86,15 +85,11 @@ function processMessagePassing(sendMessage, recieveMessage) {
   var leftId = common + leftColumn;
   var rightId = common + rightColumn;
   if (leftColumn == sendMessage.Func) {
-    console.log(leftId);
-    console.log(rightId);
-    document.getElementById(leftId).innerHTML = "o----->";
+    document.getElementById(leftId).innerHTML = "o----->" + sendMessage.Value;
     document.getElementById(rightId).innerHTML = "----->o";
   } else {
-    console.log(leftId);
-    console.log(rightId);
     document.getElementById(leftId).innerHTML = "o<-----";
-    document.getElementById(rightId).innerHTML = "<-----o";
+    document.getElementById(rightId).innerHTML = sendMessage.Value + "<-----o";
   }
 }
 
@@ -107,7 +102,6 @@ $( document ).ready(function() {
   connection.onopen = function() {
     connection.onmessage = function(e) {
       var serverMessage = JSON.parse(e.data);
-      console.log(serverMessage);
 
       // if the message is the functions initialization message
       if ('Functions' in serverMessage) {
@@ -128,7 +122,7 @@ $( document ).ready(function() {
       // if it is a read event
       if (serverMessage.Type == true) {
         // the key for a corresponding send event
-        var key = serverMessage.Chan + '.' + serverMessage.Value + ".false";
+        var key = serverMessage.Chan + '.false.' + serverMessage.Value;
         if (key in events) {
           var correspondingSend = events[key].shift();
 
@@ -140,7 +134,7 @@ $( document ).ready(function() {
 
           processMessagePassing(correspondingSend, serverMessage);
         } else {
-          var recieveEventKey = serverMessage.Chan + '.' + serverMessage.Value + ".true";
+          var recieveEventKey = serverMessage.Chan + '.true.' + serverMessage.Value;
 
           if (recieveEventKey in events) {
             events[recieveEventKey].push(serverMessage);
@@ -154,7 +148,7 @@ $( document ).ready(function() {
         }
       } else { // if it is a write event
         // the key for a corresponding recieve event
-        var key = serverMessage.Chan + '.' + serverMessage.Value + ".true";
+        var key = serverMessage.Chan + '.true.' + serverMessage.Value;
         if (key in events) {
           var correspondingRecieve = events[key].shift();
 
@@ -166,7 +160,7 @@ $( document ).ready(function() {
 
           processMessagePassing(serverMessage, correspondingRecieve);
         } else {
-          var sendEventKey = serverMessage.Chan + '.' + serverMessage.Value + ".true";
+          var sendEventKey = serverMessage.Chan + '.false.' + serverMessage.Value;
 
           if (sendEventKey in events) {
             events[sendEventKey].push(serverMessage);
