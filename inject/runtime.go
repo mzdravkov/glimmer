@@ -12,15 +12,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// for debugging
-// func init() {
-// 	go func() {
-// 		for {
-// 			fmt.Println(<-forSendingQueue)
-// 		}
-// 	}()
-// }
-
 type MessageEvent struct {
 	Func  string
 	Type  bool // true is recieving, false is sending
@@ -30,7 +21,7 @@ type MessageEvent struct {
 
 type chanLock struct {
 	Send    *sync.Mutex
-	Recieve *sync.Mutex
+	Receive *sync.Mutex
 }
 
 var (
@@ -51,7 +42,7 @@ func Locks(ch uintptr) *chanLock {
 
 	locks[ch] = &chanLock{
 		Send:    new(sync.Mutex),
-		Recieve: new(sync.Mutex),
+		Receive: new(sync.Mutex),
 	}
 	return locks[ch]
 }
@@ -98,18 +89,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ProcessRecieve(ch uintptr, value interface{}) {
+func ProcessReceive(ch uintptr, value interface{}) {
 	// get the caller of the caller of this function
 	// we get two levels below the current because
 	// this function is being called by the function literal
-	// that substitutes the recieve expression
+	// that substitutes the receive expression
 	programCounter, _, _, ok := runtime.Caller(2)
 	if !ok {
-		panic("Can't read the stack trace to find who called the ProcessRecieve function. Have no idea how to handle this.")
+		panic("Can't read the stack trace to find who called the ProcessReceive function. Have no idea how to handle this.")
 	}
 
 	caller := runtime.FuncForPC(programCounter)
-	fmt.Println("Recieve called from", caller.Name())
+	fmt.Println("Receive called from", caller.Name())
 
 	go sendMessageEvent(ch, caller.Name(), fmt.Sprintf("%d", value), true)
 }
@@ -118,10 +109,10 @@ func ProcessSend(ch uintptr, value interface{}) {
 	// get the caller of the caller of this function
 	// we get two levels below the current because
 	// this function is being called by the function literal
-	// that substitutes the recieve expression
+	// that substitutes the receive expression
 	programCounter, _, _, ok := runtime.Caller(2)
 	if !ok {
-		panic("Can't read the stack trace to find who called the ProcessRecieve function. Have no idea how to handle this.")
+		panic("Can't read the stack trace to find who called the ProcessReceive function. Have no idea how to handle this.")
 	}
 
 	caller := runtime.FuncForPC(programCounter)
@@ -141,7 +132,7 @@ func sendMessageEvent(ch uintptr, funcName, value string, eventType bool) {
 	forSendingQueue <- messageEvent
 
 	if eventType {
-		Locks(ch).Recieve.Unlock()
+		Locks(ch).Receive.Unlock()
 	} else {
 		Locks(ch).Send.Unlock()
 	}

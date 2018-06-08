@@ -62,7 +62,7 @@ type chanOperationsRewriter struct{}
 
 // Rewrite implements the gorewrite.Rewriter interface.
 // it should be called for a function body node and it
-// searches for send and recieve statement and rewrites them
+// searches for send and receive statement and rewrites them
 // to log the event of communication
 func (r *chanOperationsRewriter) Rewrite(node ast.Node) (ast.Node, gorewrite.Rewriter) {
 	switch n := node.(type) {
@@ -105,15 +105,15 @@ func addSendStmt(sendStmt *ast.SendStmt) *ast.ExprStmt {
 	}
 }
 
-// AddRecvExpr returns the glimmer substitute of a recieve expression
+// AddRecvExpr returns the glimmer substitute of a receive expression
 func addRecvExpr(recvExpr *ast.UnaryExpr) *ast.CallExpr {
 	return &ast.CallExpr{
-		Fun:  createRecieveFunc(&recvExpr.X),
+		Fun:  createReceiveFunc(&recvExpr.X),
 		Args: []ast.Expr{recvExpr.X},
 	}
 }
 
-// AddRecvWithBoolAssignStmt returns the glimmer substitute of a recieve with bool assignment statement
+// AddRecvWithBoolAssignStmt returns the glimmer substitute of a receive with bool assignment statement
 func addRecvWithBoolAssignStmt(recvAssignStmt *ast.AssignStmt) *ast.AssignStmt {
 	unaryChanExpr := recvAssignStmt.Rhs[0].(*ast.UnaryExpr)
 	return &ast.AssignStmt{
@@ -121,7 +121,7 @@ func addRecvWithBoolAssignStmt(recvAssignStmt *ast.AssignStmt) *ast.AssignStmt {
 		Tok: token.DEFINE,
 		Rhs: []ast.Expr{
 			&ast.CallExpr{
-				Fun:  createRecieveWithBoolFunc(&unaryChanExpr.X),
+				Fun:  createReceiveWithBoolFunc(&unaryChanExpr.X),
 				Args: []ast.Expr{unaryChanExpr.X},
 			},
 		},
@@ -137,35 +137,35 @@ func addGlimmerImports(fset *token.FileSet, packages map[string]*ast.Package) {
 	}
 }
 
-// createRecieveFunc creates a function that serves as a substitute for a recieve expression
-func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
+// createReceiveFunc creates a function that serves as a substitute for a receive expression
+func createReceiveFunc(ch *ast.Expr) *ast.FuncLit {
 	chType := info.TypeOf(*ch)
 	if chType == nil {
-		log.Fatal("Can't get the type of a channel in a recieve expression")
+		log.Fatal("Can't get the type of a channel in a receive expression")
 	}
 
-	funcType := createRecieveFuncType(chType, false)
+	funcType := createReceiveFuncType(chType, false)
 
 	assignStmtRhs, err := parser.ParseExpr("<-ch")
 	if err != nil {
-		panic("Can't parse rhs expression for an assignment stmt inside recieve function")
+		panic("Can't parse rhs expression for an assignment stmt inside receive function")
 	}
 
-	processRecieveFunc, err := parser.ParseExpr("glimmer.ProcessRecieve")
+	processReceiveFunc, err := parser.ParseExpr("glimmer.ProcessReceive")
 	if err != nil {
-		panic("Can't parse callProcessRecieveFunc")
+		panic("Can't parse callProcessReceiveFunc")
 	}
 
 	chExpr, assignStmtLhs, sleepFunc, reflectValueOf, locksExpr := getCommonExpressions()
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
-			&ast.ExprStmt{ // glimmer.Locks[ch].Recieve.Lock()
+			&ast.ExprStmt{ // glimmer.Locks[ch].Receive.Lock()
 				X: &ast.CallExpr{
-					Fun: &ast.SelectorExpr{ // glimmer.Locks[ch].Recieve.Lock
-						X: &ast.SelectorExpr{ // glimmer.Locks[ch].Recieve
+					Fun: &ast.SelectorExpr{ // glimmer.Locks[ch].Receive.Lock
+						X: &ast.SelectorExpr{ // glimmer.Locks[ch].Receive
 							X:   locksExpr,
-							Sel: &ast.Ident{Name: "Recieve"},
+							Sel: &ast.Ident{Name: "Receive"},
 						},
 						Sel: &ast.Ident{Name: "Lock"},
 					},
@@ -181,9 +181,9 @@ func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
 				Tok: token.DEFINE,
 				Rhs: []ast.Expr{assignStmtRhs},
 			},
-			&ast.ExprStmt{ // glimmer.ProcessRecieve(reflect.ValueOf(ch).Pointer(), value)
+			&ast.ExprStmt{ // glimmer.ProcessReceive(reflect.ValueOf(ch).Pointer(), value)
 				X: &ast.CallExpr{
-					Fun: processRecieveFunc,
+					Fun: processReceiveFunc,
 					Args: []ast.Expr{
 						&ast.CallExpr{ // reflect.ValueOf(ch).Pointer()
 							Fun: &ast.SelectorExpr{ // reflect.ValueOf(ch).Pointer
@@ -210,40 +210,40 @@ func createRecieveFunc(ch *ast.Expr) *ast.FuncLit {
 	}
 }
 
-// createRecieveWithBoolFunc creates a function that serves as a substitute for a recieve with bool expression
-func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
+// createReceiveWithBoolFunc creates a function that serves as a substitute for a receive with bool expression
+func createReceiveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 	chType := info.TypeOf(*ch)
 	if chType == nil {
-		log.Fatal("Can't get the type of a channel in a recieve expression")
+		log.Fatal("Can't get the type of a channel in a receive expression")
 	}
 
-	funcType := createRecieveFuncType(chType, true)
+	funcType := createReceiveFuncType(chType, true)
 
 	assignStmtLhsOk, err := parser.ParseExpr("ok")
 	if err != nil {
-		panic("Can't parse lhs 'ok' expression for an assignment stmt inside recieve function")
+		panic("Can't parse lhs 'ok' expression for an assignment stmt inside receive function")
 	}
 
 	assignStmtRhs, err := parser.ParseExpr("<-ch")
 	if err != nil {
-		panic("Can't parse rhs expression for an assignment stmt inside recieve function")
+		panic("Can't parse rhs expression for an assignment stmt inside receive function")
 	}
 
-	processRecieveFunc, err := parser.ParseExpr("glimmer.ProcessRecieve")
+	processReceiveFunc, err := parser.ParseExpr("glimmer.ProcessReceive")
 	if err != nil {
-		panic("Can't parse ProcessRecieveFunc")
+		panic("Can't parse ProcessReceiveFunc")
 	}
 
 	chExpr, assignStmtLhsValue, sleepFunc, reflectValueOf, locksExpr := getCommonExpressions()
 
 	body := &ast.BlockStmt{
 		List: []ast.Stmt{
-			&ast.ExprStmt{ // glimmer.Locks[ch].Recieve.Lock()
+			&ast.ExprStmt{ // glimmer.Locks[ch].Receive.Lock()
 				X: &ast.CallExpr{
-					Fun: &ast.SelectorExpr{ // glimmer.Locks[ch].Recieve.Lock
-						X: &ast.SelectorExpr{ // glimmer.Locks[ch].Recieve
+					Fun: &ast.SelectorExpr{ // glimmer.Locks[ch].Receive.Lock
+						X: &ast.SelectorExpr{ // glimmer.Locks[ch].Receive
 							X:   locksExpr,
-							Sel: &ast.Ident{Name: "Recieve"},
+							Sel: &ast.Ident{Name: "Receive"},
 						},
 						Sel: &ast.Ident{Name: "Lock"},
 					},
@@ -259,9 +259,9 @@ func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 				Tok: token.DEFINE,
 				Rhs: []ast.Expr{assignStmtRhs},
 			},
-			&ast.ExprStmt{ // glimmer.ProcessRecieve(reflect.ValueOf(ch).Pointer(), value)
+			&ast.ExprStmt{ // glimmer.ProcessReceive(reflect.ValueOf(ch).Pointer(), value)
 				X: &ast.CallExpr{
-					Fun: processRecieveFunc,
+					Fun: processReceiveFunc,
 					Args: []ast.Expr{
 						&ast.CallExpr{ // reflect.ValueOf(ch).Pointer()
 							Fun: &ast.SelectorExpr{ // reflect.ValueOf(ch).Pointer
@@ -288,13 +288,13 @@ func createRecieveWithBoolFunc(ch *ast.Expr) *ast.FuncLit {
 	}
 }
 
-// createRecieveFuncType creates an ast.FuncType with one argument, which is a channel type and
+// createReceiveFuncType creates an ast.FuncType with one argument, which is a channel type and
 // the return results are the element type of the channel and (if withBool is true)
 // a boolean value
-func createRecieveFuncType(chType types.Type, withBool bool) *ast.FuncType {
+func createReceiveFuncType(chType types.Type, withBool bool) *ast.FuncType {
 	paramType, err := parser.ParseExpr(fmt.Sprintf("%s", chType))
 	if err != nil {
-		panic("Can't parse channel type for the parameter of a recieve function")
+		panic("Can't parse channel type for the parameter of a receive function")
 	}
 	params := &ast.FieldList{
 		List: []*ast.Field{
@@ -313,7 +313,7 @@ func createRecieveFuncType(chType types.Type, withBool bool) *ast.FuncType {
 	// and not so hacky way to do this.
 	resultType, err := parser.ParseExpr(fmt.Sprintf("%s", chType.String()[5:]))
 	if err != nil {
-		panic("Can't parse channel element type for the return type of a recieve function")
+		panic("Can't parse channel element type for the return type of a receive function")
 	}
 	results := &ast.FieldList{
 		List: []*ast.Field{
@@ -415,7 +415,7 @@ func createSendFunc(ch, value *ast.Expr) *ast.FuncLit {
 				Chan:  chExpr,
 				Value: valueExpr,
 			},
-			&ast.ExprStmt{ // glimmer.ProcessRecieve(reflect.ValueOf(ch).Pointer(), value)
+			&ast.ExprStmt{ // glimmer.ProcessReceive(reflect.ValueOf(ch).Pointer(), value)
 				X: &ast.CallExpr{
 					Fun: processSendFunc,
 					Args: []ast.Expr{

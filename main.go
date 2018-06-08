@@ -72,9 +72,12 @@ func run(path string, flags map[string]string) {
 			// export the ast to a file in glimmer_tmp directory
 			var buf bytes.Buffer
 			printer.Fprint(&buf, fset, file)
-			newFileName := filepath.Join(glimmerTmpFolderPath, fileName)
+			relativeFileName, err := filepath.Rel(path, fileName)
+			if err != nil {
+				log.Fatal(err)
+			}
+			newFileName := filepath.Join(glimmerTmpFolderPath, relativeFileName)
 			ioutil.WriteFile(newFileName, buf.Bytes(), os.ModePerm)
-
 		}
 	}
 
